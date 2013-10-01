@@ -7,6 +7,7 @@ import (
 	"github.com/shxsun/klog"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -21,7 +22,11 @@ func filter(watch chan *fsnotify.FileEvent) chan *fsnotify.FileEvent {
 	go func() {
 		for {
 			ev := <-watch
-			K.Debug("FILTER:", ev)
+			if isIgnore(filepath.Base(ev.Name)) {
+				K.Debugf("IGNORE: %s", ev.Name)
+				continue
+			}
+			// delete or rename has no modify time
 			if ev.IsDelete() || ev.IsRename() {
 				filterd <- ev
 				continue
@@ -31,12 +36,14 @@ func filter(watch chan *fsnotify.FileEvent) chan *fsnotify.FileEvent {
 				//K.Warnf("get file mod time failed: %s", err)
 				continue
 			}
-			if t := modifyTime[ev.Name]; mt != t {
-				filterd <- ev
-				modifyTime[ev.Name] = mt
-			} else {
+			t := modifyTime[ev.Name]
+			if mt == t {
 				K.Debugf("SKIP: %s", ev.Name)
+				continue
 			}
+
+			filterd <- ev
+			modifyTime[ev.Name] = mt
 		}
 	}()
 	return filterd
@@ -54,11 +61,14 @@ func watchEvent(watcher *fsnotify.Watcher, name string, args ...string) {
 	var cmd *exec.Cmd
 	filterEvent := filter(watcher.Event)
 	for {
+		ev := <-filterEvent
+		K.Info("Sense first:", ev)
+	CHECK:
 		select {
-		case ev := <-filterEvent:
-			K.Info(ev)
+		case ev = <-filterEvent:
+			K.Info("Sense again: ", ev)
+			goto CHECK
 		case <-time.After(notifyDelay):
-			continue
 		}
 		// stop cmd
 		if cmd != nil && cmd.Process != nil {
@@ -69,22 +79,26 @@ func watchEvent(watcher *fsnotify.Watcher, name string, args ...string) {
 		cmd = exec.Command(name, args...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-		fmt.Println(fmt.Sprintf("%s %5s %s", LeftRight, "START", LeftRight))
+		K.Info(fmt.Sprintf("%s %5s %s", LeftRight, "START", LeftRight))
 		err := cmd.Start()
 		if err != nil {
 			K.Error(err)
 			continue
 		} else {
 			go func(cmd *exec.Cmd) {
-				cmd.Wait()
-				fmt.Println(fmt.Sprintf("%s %5s %s", LeftRight, "E N D", LeftRight))
+				err := cmd.Wait()
+				if err != nil {
+					K.Error(fmt.Sprintf("%s %5s %s", LeftRight, "ERROR", LeftRight))
+				} else {
+					K.Info(fmt.Sprintf("%s %5s %s", LeftRight, "E N D", LeftRight))
+				}
 			}(cmd)
 		}
 	}
 }
 
 func NewWatcher(paths []string, name string, args ...string) {
-	//K.SetLevel(klog.LDebug)
+	K.SetLevel(klog.LDebug)
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
 		K.Fatalf("fail to create new Watcher: %s", err)
@@ -103,7 +117,7 @@ func NewWatcher(paths []string, name string, args ...string) {
 
 var (
 	notifyDelay time.Duration = time.Second * 1
-	LeftRight                 = strings.Repeat("-", 25)
+	LeftRight                 = strings.Repeat("-", 20)
 )
 
 func main() {
