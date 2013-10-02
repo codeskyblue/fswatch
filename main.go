@@ -1,9 +1,9 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"github.com/howeyc/fsnotify"
+	"github.com/jessevdk/go-flags"
 	"github.com/shxsun/klog"
 	"os"
 	"os/exec"
@@ -98,7 +98,6 @@ func watchEvent(watcher *fsnotify.Watcher, name string, args ...string) {
 }
 
 func NewWatcher(paths []string, name string, args ...string) {
-	K.SetLevel(klog.LDebug)
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
 		K.Fatalf("fail to create new Watcher: %s", err)
@@ -117,19 +116,26 @@ func NewWatcher(paths []string, name string, args ...string) {
 
 var (
 	notifyDelay time.Duration = time.Second * 1
-	LeftRight                 = strings.Repeat("-", 20)
+	LeftRight                 = strings.Repeat("-", 10)
 )
 
+var opts struct {
+	Verbose bool `short:"v" long:"verbose" description:"Show verbose debug infomation"`
+}
+
 func main() {
-	flag.Parse()
-	if flag.NArg() == 0 {
-		fmt.Printf("Usage: %s -a [watch_path] cmd [args...]\n", os.Args[0])
+	args, err := flags.Parse(&opts)
+	if err != nil {
+		os.Exit(1)
+	}
+	if opts.Verbose {
+		K.SetLevel(klog.LDebug)
+	}
+
+	if len(args) == 0 {
+		fmt.Printf("Use %s --help for more details\n", os.Args[0])
 		return
 	}
-	cmd := exec.Command(flag.Arg(0))
-	cmd.Args = flag.Args()
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
 
-	NewWatcher([]string{"."}, flag.Arg(0), flag.Args()[1:]...)
+	NewWatcher([]string{"."}, args[0], args[1:]...)
 }
