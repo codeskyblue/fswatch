@@ -7,15 +7,16 @@ import (
 )
 
 var (
-	ignorePattens = make([]*regexp.Regexp, 0, 20)
+	ignorePattens []*regexp.Regexp
 	ignoreLoaded  = false
 )
 
-func loadIgnore() {
-	data, err := ioutil.ReadFile(".gitignore")
+func loadGitignore(filename string) []*regexp.Regexp{
+	ignores := make([]*regexp.Regexp, 0, 20)
+	data, err := ioutil.ReadFile(filename)
 	if err != nil {
-		K.Error(".gitignore file open failed")
-		return
+		K.Errorf("file '%s' open failed", filename)
+		return nil
 	}
 
 	lines := strings.Split(string(data), "\n")
@@ -33,14 +34,15 @@ func loadIgnore() {
 				continue
 			}
 			K.Debug("init: ", line)
-			ignorePattens = append(ignorePattens, r)
+			ignores = append(ignores, r)
 		}
 	}
+	return ignores
 }
 
 func isIgnore(s string) bool {
 	if !ignoreLoaded {
-		loadIgnore()
+		ignorePattens = loadGitignore(".gitignore")
 		ignoreLoaded = true
 	}
 	ok := false

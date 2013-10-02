@@ -49,7 +49,7 @@ func filter(watch chan *fsnotify.FileEvent) chan *fsnotify.FileEvent {
 	return filterd
 }
 
-// ths main goroutine
+// the main goroutine
 func watchEvent(watcher *fsnotify.Watcher, name string, args ...string) {
 	go func() {
 		for {
@@ -105,7 +105,7 @@ func NewWatcher(paths []string, name string, args ...string) {
 
 	K.Info("initial watcher")
 	for _, path := range paths {
-		K.Debug("watch directory: %s", path)
+		K.Debugf("watch directory: %s", path)
 		err = w.Watch(path)
 		if err != nil {
 			K.Fatal("fail to watch directory: %s", err)
@@ -121,16 +121,25 @@ var (
 
 var opts struct {
 	Verbose bool `short:"v" long:"verbose" description:"Show verbose debug infomation"`
+	Delay string `long:"delay" description:"Trigger event buffer time" default:"0.5s"`
 }
 
 func main() {
-	args, err := flags.Parse(&opts)
+	parser := flags.NewParser(&opts, flags.Default | flags.PassAfterNonOption)
+	args, err := parser.Parse()
+
 	if err != nil {
 		os.Exit(1)
 	}
 	if opts.Verbose {
 		K.SetLevel(klog.LDebug)
 	}
+	notifyDelay, err = time.ParseDuration(opts.Delay)
+	if err != nil {
+		K.Warn(err)
+		notifyDelay = time.Millisecond * 500
+	}
+	K.Debugf("delay time: %s", notifyDelay)
 
 	if len(args) == 0 {
 		fmt.Printf("Use %s --help for more details\n", os.Args[0])

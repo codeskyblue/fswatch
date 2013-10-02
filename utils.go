@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-// getFileModTime retuens unix timestamp of `os.File.ModTime` by given path.
+// get file modify time(unix time stamp)
 func getFileModTime(path string) (timestamp int64, err error) {
 	f, err := os.Open(path)
 	if err != nil {
