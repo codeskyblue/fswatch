@@ -1,21 +1,15 @@
-# trigger
+# fswatch
 
-cli tools. watch file change, and do use specfied commands.
+command tools. When file change do user defined commands. 
+(filter event by `.gitignore`)
 
-** Developing ...**
+Code refs from [bee](https://github.com/astaxie/bee), fsnotify
 
-Below is Chinese words
-还是中文写起来更容易些。暂时先写中文了。
+fswatch will follow 3 steps.
 
-这个是我写的第二个库了，第一个是带一个日志模块，可以带颜色的(klog).
+1. notify if file under current directory changes.
+2. filter event by `.gitignore`
+3. do user defined commands(passed by commands)
 
-代码参考了各个地方gh(a git tool written by golang)，bee，klog。
-
-下个定义： 监控文件的变化，根据`.gitignore`文件进行过滤，并执行相应的命令。
-
-我假设你了解一点git的基础知识，知道`.gitignore`是做什么用的。
-
-想了半天也没想出啥好名字，fsense ，有点像google的adsense。
-
-
-我比较喜欢的一种用法，就是`fsense sh -c "go test -i && go install"`。
+## preview
+![fswatch](images/fswatch.png)
