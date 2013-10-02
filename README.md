@@ -1,8 +1,7 @@
 # fswatch
 
-Define `fswatch`: Command line tool. Use file system event to trigger user defined commands. 
+A definition of **fswatch**: Command line tool. Use file system event to trigger user defined commands. 
 
-Code refs from [bee](https://github.com/astaxie/bee), fsnotify
 
 fswatch will follow 3 steps.
 
@@ -11,11 +10,11 @@ fswatch will follow 3 steps.
 3. do user defined commands(passed by commands)
 
 ## How to use
-**I just give a example**
+*I will show you an example*
 
 ```
 go get github.com/shxsun/fswatch
-# cd to a git project
+# cd to a golang project
 # ...
 fswatch go test
 
@@ -26,3 +25,8 @@ touch test.go
 ```
 
 ![fswatch](images/fswatch.png)
+
+## Friendly link: 
+
+* [bee](https://github.com/astaxie/bee)
+* [fsnotify](https://github.com/howeyc/fsnotify)
