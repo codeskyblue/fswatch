@@ -72,13 +72,18 @@ func filter(watch chan *fsnotify.FileEvent) chan *fsnotify.FileEvent {
 				filterd <- ev
 				continue
 			}
-			mt, err := getFileModTime(ev.Name)
+
+			fi, err := getFileInfo(ev.Name)
 			if err != nil {
 				//K.Warnf("get file mod time failed: %s", err)
 				continue
 			}
-			t := modifyTime[ev.Name]
-			if mt == t {
+			if fi.IsDir() { // ignore directory changes
+				K.Debugf("Dir ignore: %s", ev.Name)
+				continue
+			}
+			mt := fi.ModTime().Unix()
+			if mt == modifyTime[ev.Name] {
 				K.Debugf("SKIP: %s", ev.Name)
 				continue
 			}

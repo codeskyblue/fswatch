@@ -12,7 +12,7 @@ import (
 )
 
 // the main goroutine
-func watchEvent(watcher *fsnotify.Watcher, name string, args ...string) {
+func watchEvent(watcher *fsnotify.Watcher, origCmd *exec.Cmd) {
 	go func() {
 		for {
 			err := <-watcher.Error          // ignore watcher error
@@ -37,10 +37,9 @@ func watchEvent(watcher *fsnotify.Watcher, name string, args ...string) {
 			K.Info("stop process")
 			cmd.Process.Kill()
 		}
-		// start cmd
-		cmd = exec.Command(name, args...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+		// create new cmd
+		newCmd := *origCmd
+		cmd = &newCmd
 		K.Info(fmt.Sprintf("%s %5s %s", LeftRight, "START", LeftRight))
 		err := cmd.Start()
 		if err != nil {
@@ -59,7 +58,7 @@ func watchEvent(watcher *fsnotify.Watcher, name string, args ...string) {
 	}
 }
 
-func NewWatcher(paths []string, name string, args ...string) {
+func NewWatcher(paths []string, cmd *exec.Cmd) {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
 		K.Fatalf("fail to create new Watcher: %s", err)
@@ -73,7 +72,7 @@ func NewWatcher(paths []string, name string, args ...string) {
 			K.Fatal("fail to watch directory: %s", err)
 		}
 	}
-	watchEvent(w, name, args...)
+	watchEvent(w, cmd)
 }
 
 var (
@@ -109,5 +108,13 @@ func main() {
 		return
 	}
 
-	NewWatcher([]string{"."}, args[0], args[1:]...)
+	// check if cmd exists
+	_, err = exec.LookPath(args[0])
+	if err != nil {
+		K.Fatal(err)
+	}
+	cmd := exec.Command(args[0], args[1:]...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	NewWatcher([]string{"."}, cmd)
 }
