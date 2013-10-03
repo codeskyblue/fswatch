@@ -1,12 +1,12 @@
 package main
 
 import (
-	"testing"
 	"io/ioutil"
 	"os"
+	"testing"
 )
 
-var sample=`
+var sample = `
 # comment
 #
 *.cgo
@@ -28,10 +28,10 @@ func TestFilter(t *testing.T) {
 	if isIgnore("xxx.go") {
 		t.Error("xxx.go should not be ignored")
 	}
-	if ! isIgnore("xxx.swp"){
+	if !isIgnore("xxx.swp") {
 		t.Error("xxx.swp should be ignored")
 	}
-	if ! isIgnore("filter.exe"){
+	if !isIgnore("filter.exe") {
 		t.Error("filter.exe should be ignored")
 	}
 }

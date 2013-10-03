@@ -7,47 +7,9 @@ import (
 	"github.com/shxsun/klog"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 )
-
-var (
-	K = klog.NewLogger(nil, "")
-)
-
-func filter(watch chan *fsnotify.FileEvent) chan *fsnotify.FileEvent {
-	modifyTime := make(map[string]int64)
-	filterd := make(chan *fsnotify.FileEvent)
-	go func() {
-		for {
-			ev := <-watch
-			if isIgnore(filepath.Base(ev.Name)) {
-				K.Debugf("IGNORE: %s", ev.Name)
-				continue
-			}
-			// delete or rename has no modify time
-			if ev.IsDelete() || ev.IsRename() {
-				filterd <- ev
-				continue
-			}
-			mt, err := getFileModTime(ev.Name)
-			if err != nil {
-				//K.Warnf("get file mod time failed: %s", err)
-				continue
-			}
-			t := modifyTime[ev.Name]
-			if mt == t {
-				K.Debugf("SKIP: %s", ev.Name)
-				continue
-			}
-
-			filterd <- ev
-			modifyTime[ev.Name] = mt
-		}
-	}()
-	return filterd
-}
 
 // the main goroutine
 func watchEvent(watcher *fsnotify.Watcher, name string, args ...string) {
@@ -103,7 +65,7 @@ func NewWatcher(paths []string, name string, args ...string) {
 		K.Fatalf("fail to create new Watcher: %s", err)
 	}
 
-	K.Info("initial watcher")
+	K.Info("Initial watcher")
 	for _, path := range paths {
 		K.Debugf("watch directory: %s", path)
 		err = w.Watch(path)
@@ -115,17 +77,18 @@ func NewWatcher(paths []string, name string, args ...string) {
 }
 
 var (
-	notifyDelay time.Duration = time.Second * 1
-	LeftRight                 = strings.Repeat("-", 10)
+	K           = klog.NewLogger(nil, "")
+	notifyDelay time.Duration
+	LeftRight   = strings.Repeat("-", 10)
 )
 
 var opts struct {
-	Verbose bool `short:"v" long:"verbose" description:"Show verbose debug infomation"`
-	Delay string `long:"delay" description:"Trigger event buffer time" default:"0.5s"`
+	Verbose bool   `short:"v" long:"verbose" description:"Show verbose debug infomation"`
+	Delay   string `long:"delay" description:"Trigger event buffer time" default:"0.5s"`
 }
 
 func main() {
-	parser := flags.NewParser(&opts, flags.Default | flags.PassAfterNonOption)
+	parser := flags.NewParser(&opts, flags.Default|flags.PassAfterNonOption)
 	args, err := parser.Parse()
 
 	if err != nil {
