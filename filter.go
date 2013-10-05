@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -30,6 +31,7 @@ func loadGitignore(filename string) []*regexp.Regexp {
 		if !strings.HasPrefix(line, "#") {
 			line = strings.Replace(line, ".", "[.]", -1)
 			line = strings.Replace(line, "*", ".*", -1)
+			line = "^" + line + "$"
 			r, err := regexp.Compile(line)
 			if err != nil {
 				K.Error(err)
@@ -50,6 +52,9 @@ func isIgnore(s string) bool {
 	ok := false
 	for _, patten := range ignorePattens {
 		if patten.MatchString(s) {
+			K.Debugf("patten %s match %s",
+				strconv.Quote(patten.String()),
+				strconv.Quote(s))
 			ok = true
 			break
 		}

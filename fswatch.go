@@ -11,8 +11,29 @@ import (
 	"time"
 )
 
-// the main goroutine
-func watchEvent(watcher *fsnotify.Watcher, origCmd *exec.Cmd) {
+var (
+	K           = klog.NewLogger(nil, "")
+	notifyDelay time.Duration
+	LeftRight   = strings.Repeat("-", 10)
+)
+
+// generate new event
+func NewEvent(paths []string) chan *fsnotify.FileEvent {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		K.Fatalf("fail to create new Watcher: %s", err)
+	}
+	K.Info("Initial watcher")
+
+	for _, path := range paths {
+		K.Debugf("watch directory: %s", path)
+		err = watcher.Watch(path)
+		if err != nil {
+			K.Fatal("fail to watch directory: %s", err)
+		}
+	}
+
+	// ignore watcher error
 	go func() {
 		for {
 			err := <-watcher.Error          // ignore watcher error
@@ -20,8 +41,12 @@ func watchEvent(watcher *fsnotify.Watcher, origCmd *exec.Cmd) {
 		}
 	}()
 
+	return watcher.Event
+}
+
+func execute(e chan *fsnotify.FileEvent, origCmd *exec.Cmd) {
 	var cmd *exec.Cmd
-	filterEvent := filter(watcher.Event)
+	filterEvent := filter(e)
 	for {
 		ev := <-filterEvent
 		K.Info("Sense first:", ev)
@@ -58,29 +83,6 @@ func watchEvent(watcher *fsnotify.Watcher, origCmd *exec.Cmd) {
 	}
 }
 
-func NewWatcher(paths []string, cmd *exec.Cmd) {
-	w, err := fsnotify.NewWatcher()
-	if err != nil {
-		K.Fatalf("fail to create new Watcher: %s", err)
-	}
-
-	K.Info("Initial watcher")
-	for _, path := range paths {
-		K.Debugf("watch directory: %s", path)
-		err = w.Watch(path)
-		if err != nil {
-			K.Fatal("fail to watch directory: %s", err)
-		}
-	}
-	watchEvent(w, cmd)
-}
-
-var (
-	K           = klog.NewLogger(nil, "")
-	notifyDelay time.Duration
-	LeftRight   = strings.Repeat("-", 10)
-)
-
 var opts struct {
 	Verbose bool   `short:"v" long:"verbose" description:"Show verbose debug infomation"`
 	Delay   string `long:"delay" description:"Trigger event buffer time" default:"0.5s"`
@@ -116,5 +118,6 @@ func main() {
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	NewWatcher([]string{"."}, cmd)
+	event := NewEvent([]string{"."})
+	execute(event, cmd)
 }
