@@ -28,6 +28,5 @@ touch test.go
 ![fswatch](images/fswatch.png)
 
 ## Friendly link: 
-
 * [bee](https://github.com/astaxie/bee)
 * [fsnotify](https://github.com/howeyc/fsnotify)
