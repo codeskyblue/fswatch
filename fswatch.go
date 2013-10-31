@@ -2,13 +2,15 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
+
 	"github.com/howeyc/fsnotify"
 	"github.com/jessevdk/go-flags"
 	"github.com/shxsun/klog"
-	"os"
-	"os/exec"
-	"strings"
-	"time"
 )
 
 var (
@@ -17,8 +19,31 @@ var (
 	LeftRight   = strings.Repeat("-", 10)
 )
 
+// Add dir and children (recursively) to watcher
+func watchDirAndChildren(w *fsnotify.Watcher, path string, depth int) error {
+	if err := w.Watch(path); err != nil {
+		return err
+	}
+	baseNumSeps := strings.Count(path, string(os.PathSeparator))
+	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			pathDepth := strings.Count(path, string(os.PathSeparator)) - baseNumSeps
+			if pathDepth > depth {
+				return filepath.SkipDir
+			}
+			if opts.Verbose {
+				fmt.Fprintln(os.Stderr, "Watching", path)
+			}
+			if err := w.Watch(path); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 // generate new event
-func NewEvent(paths []string) chan *fsnotify.FileEvent {
+func NewEvent(paths []string, depth int) chan *fsnotify.FileEvent {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		K.Fatalf("fail to create new Watcher: %s", err)
@@ -27,7 +52,7 @@ func NewEvent(paths []string) chan *fsnotify.FileEvent {
 
 	for _, path := range paths {
 		K.Debugf("watch directory: %s", path)
-		err = watcher.Watch(path)
+		err = watchDirAndChildren(watcher, path, depth)
 		if err != nil {
 			K.Fatal("fail to watch directory: %s", err)
 		}
@@ -47,6 +72,10 @@ func NewEvent(paths []string) chan *fsnotify.FileEvent {
 func execute(e chan *fsnotify.FileEvent, origCmd *exec.Cmd) {
 	var cmd *exec.Cmd
 	filterEvent := filter(e)
+	// make first time, do command
+	go func() {
+		filterEvent <- &fsnotify.FileEvent{}
+	}()
 	for {
 		ev := <-filterEvent
 		K.Info("Sense first:", ev)
@@ -86,6 +115,7 @@ func execute(e chan *fsnotify.FileEvent, origCmd *exec.Cmd) {
 var opts struct {
 	Verbose bool   `short:"v" long:"verbose" description:"Show verbose debug infomation"`
 	Delay   string `long:"delay" description:"Trigger event buffer time" default:"0.5s"`
+	Depth   int    `short:"d" long:"depth" description:"depth of watch" default:"1"`
 }
 
 func main() {
@@ -118,6 +148,6 @@ func main() {
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	event := NewEvent([]string{"."})
+	event := NewEvent([]string{"."}, opts.Depth)
 	execute(event, cmd)
 }

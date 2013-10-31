@@ -27,6 +27,18 @@ touch test.go
 
 ![fswatch](images/fswatch.png)
 
+## Shell help
+	Usage:
+	  fswatch [OPTIONS]
+
+	Help Options:
+	  -h, --help=    Show this help message
+
+	Application Options:
+	  -v, --verbose  Show verbose debug infomation
+		  --delay=   Trigger event buffer time (0.5s)
+	  -d, --depth=   depth of watch (1)
+
 ## Friendly link: 
 * [bee](https://github.com/astaxie/bee)
 * [fsnotify](https://github.com/howeyc/fsnotify)
