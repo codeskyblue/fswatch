@@ -17,6 +17,9 @@ var (
 	K           = klog.NewLogger(nil, "")
 	notifyDelay time.Duration
 	LeftRight   = strings.Repeat("-", 10)
+
+	// golang c/cpp php js
+	LangExts = []string{".go", ".cpp", ".c", ".h", ".php", ".js"}
 )
 
 // Add dir and children (recursively) to watcher

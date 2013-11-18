@@ -44,6 +44,19 @@ func loadGitignore(filename string) []*regexp.Regexp {
 	return ignores
 }
 
+func isLangSource(path string) bool {
+	basename := filepath.Base(path)
+	if !strings.HasPrefix(basename, ".") {
+		ext := filepath.Ext(basename)
+		for _, okext := range LangExts {
+			if ext == okext {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func isIgnore(s string) bool {
 	if !ignoreLoaded {
 		ignorePattens = loadGitignore(".gitignore")
@@ -72,6 +85,12 @@ func filter(watch chan *fsnotify.FileEvent) chan *fsnotify.FileEvent {
 				K.Debugf("IGNORE: %s", ev.Name)
 				continue
 			}
+			// only lang src can pass
+			if !isLangSource(ev.Name) {
+				K.Debugf("not source file: %s", ev.Name)
+				continue
+			}
+
 			// delete or rename has no modify time
 			if ev.IsDelete() || ev.IsRename() {
 				filterd <- ev
@@ -87,6 +106,7 @@ func filter(watch chan *fsnotify.FileEvent) chan *fsnotify.FileEvent {
 				K.Debugf("Dir ignore: %s", ev.Name)
 				continue
 			}
+
 			mt := fi.ModTime().Unix()
 			if mt == modifyTime[ev.Name] {
 				K.Debugf("SKIP: %s", ev.Name)
