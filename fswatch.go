@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aybabtme/color"
 	"github.com/howeyc/fsnotify"
 	"github.com/jessevdk/go-flags"
 	"github.com/shxsun/klog"
@@ -20,6 +21,8 @@ var (
 
 	// golang c/cpp php js
 	LangExts = []string{".go", ".cpp", ".c", ".h", ".php", ".js"}
+
+	brush = color.NewBrush("", color.DarkGreenPaint)
 )
 
 // Add dir and children (recursively) to watcher
@@ -92,12 +95,14 @@ func execute(e chan *fsnotify.FileEvent, origCmd *exec.Cmd) {
 		// stop cmd
 		if cmd != nil && cmd.Process != nil {
 			K.Info("stop process")
-			cmd.Process.Kill()
+			if err := cmd.Process.Kill(); err != nil {
+				K.Warn(err)
+			}
 		}
 		// create new cmd
 		newCmd := *origCmd
 		cmd = &newCmd
-		K.Info(fmt.Sprintf("%s %5s %s", LeftRight, "START", LeftRight))
+		fmt.Println(brush(StringCenter(" START ", TermSize)))
 		err := cmd.Start()
 		if err != nil {
 			K.Error(err)
@@ -106,10 +111,9 @@ func execute(e chan *fsnotify.FileEvent, origCmd *exec.Cmd) {
 			go func(cmd *exec.Cmd) {
 				err := cmd.Wait()
 				if err != nil {
-					K.Error(fmt.Sprintf("%s %5s %s", LeftRight, "ERROR", LeftRight))
-				} else {
-					K.Info(fmt.Sprintf("%s %5s %s", LeftRight, "E N D", LeftRight))
+					K.Warn(err)
 				}
+				fmt.Println(brush(StringCenter(" E-N-D ", TermSize)))
 			}(cmd)
 		}
 	}
