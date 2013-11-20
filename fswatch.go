@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aybabtme/color"
 	"github.com/howeyc/fsnotify"
 	"github.com/jessevdk/go-flags"
+	"github.com/shxsun/fswatch/termsize"
 	"github.com/shxsun/klog"
 )
 
@@ -21,8 +21,6 @@ var (
 
 	// golang c/cpp php js
 	LangExts = []string{".go", ".cpp", ".c", ".h", ".php", ".js"}
-
-	brush = color.NewBrush("", color.DarkGreenPaint)
 )
 
 // Add dir and children (recursively) to watcher
@@ -102,7 +100,7 @@ func execute(e chan *fsnotify.FileEvent, origCmd *exec.Cmd) {
 		// create new cmd
 		newCmd := *origCmd
 		cmd = &newCmd
-		fmt.Println(brush(StringCenter(" START ", TermSize)))
+		termsize.Println(StringCenter(" START ", TermSize))
 		err := cmd.Start()
 		if err != nil {
 			K.Error(err)
@@ -113,7 +111,7 @@ func execute(e chan *fsnotify.FileEvent, origCmd *exec.Cmd) {
 				if err != nil {
 					K.Warn(err)
 				}
-				fmt.Println(brush(StringCenter(" E-N-D ", TermSize)))
+				termsize.Println(StringCenter(" E-N-D ", TermSize))
 			}(cmd)
 		}
 	}
