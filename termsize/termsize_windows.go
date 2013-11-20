@@ -1,5 +1,5 @@
 package termsize
 
-func getTerminalColumns() int {
+func GetTerminalColumns() int {
 	return 80
 }

@@ -46,12 +46,14 @@ func loadGitignore(filename string) []*regexp.Regexp {
 
 func isLangSource(path string) bool {
 	basename := filepath.Base(path)
-	if !strings.HasPrefix(basename, ".") {
-		ext := filepath.Ext(basename)
-		for _, okext := range LangExts {
-			if ext == okext {
-				return true
-			}
+	// ignore hidden file
+	if strings.HasPrefix(basename, ".") {
+		return false
+	}
+	ext := filepath.Ext(basename)
+	for _, okExt := range LangExts {
+		if ext == okExt {
+			return true
 		}
 	}
 	return false
