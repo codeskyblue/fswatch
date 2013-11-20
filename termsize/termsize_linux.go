@@ -11,8 +11,9 @@ const (
 	TIOCGWINSZ = 0x5413
 )
 
+var brush = color.NewBrush("", color.GreenPaint)
+
 func Println(s ...interface{}) {
-	var brush = color.NewBrush("", color.DarkGreenPaint)
-	p = fmt.Sprintln(s...)
+	p := fmt.Sprint(s...)
 	fmt.Println(brush(p))
 }
