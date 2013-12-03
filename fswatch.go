@@ -12,6 +12,8 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/shxsun/fswatch/termsize"
 	"github.com/shxsun/klog"
+
+	//"github.com/shxsun/exec"
 )
 
 var (
@@ -120,7 +122,7 @@ func execute(e chan *fsnotify.FileEvent, origCmd *exec.Cmd) {
 var opts struct {
 	Verbose bool   `short:"v" long:"verbose" description:"Show verbose debug infomation"`
 	Delay   string `long:"delay" description:"Trigger event buffer time" default:"0.5s"`
-	Depth   int    `short:"d" long:"depth" description:"depth of watch" default:"1"`
+	Depth   int    `short:"d" long:"depth" description:"depth of watch" default:"3"`
 }
 
 func main() {
