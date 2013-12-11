@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	logs        = klog.DevLog
+	logs        = klog.DevLog.SetLevel(klog.LInfo)
 	notifyDelay time.Duration
 	LangExts    []string
 )
@@ -109,10 +109,11 @@ func execute(e chan *fsnotify.FileEvent, origCmd *exec.Cmd) {
 			continue
 		} else {
 			go func(cmd *exec.Cmd) {
-				err := cmd.Wait()
-				if err != nil {
-					logs.Warn(err)
-				}
+				_ = cmd
+				//err := cmd.Wait()
+				//if err != nil {
+				//	logs.Warn(err)
+				//}
 				termsize.Println(StringCenter(" E-N-D ", TermSize))
 			}(cmd)
 		}

@@ -2,9 +2,12 @@
 package main
 
 import (
-	"github.com/shxsun/fswatch/termsize"
 	"os"
+	"reflect"
+	"runtime"
 	"strings"
+
+	"github.com/shxsun/fswatch/termsize"
 )
 
 // center string in center
@@ -35,4 +38,8 @@ func getFileInfo(path string) (fi os.FileInfo, err error) {
 	defer f.Close()
 	fi, err = f.Stat()
 	return
+}
+
+func GetFunctionName(i interface{}) string {
+	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }

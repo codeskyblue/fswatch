@@ -102,12 +102,13 @@ func filter(watch chan *fsnotify.FileEvent, funcs ...FilterFunc) chan *fsnotify.
 		for {
 			ev := <-watch
 			break2 := false
-			for i, filterFunc := range funcs {
+			for _, filterFunc := range funcs {
 				// FIXME: how to get func name
 				//name := reflect.ValueOf(filterFunc).Type().Name()
 				//logs.Warn("func name", name)
 				n := filterFunc(ev)
-				logs.Debug("filter", i, "action:", n)
+
+				logs.Debug("filter: ", GetFunctionName(n), "action: ", n)
 				if n == FALLTHROUGH {
 					continue
 				} else if n == REJECT {
