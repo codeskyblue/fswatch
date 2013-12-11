@@ -30,14 +30,16 @@ touch test.go
 ## Shell help
 	Usage:
 	  fswatch [OPTIONS]
-
-	Help Options:
-	  -h, --help=    Show this help message
-
+	
 	Application Options:
 	  -v, --verbose  Show verbose debug infomation
-		  --delay=   Trigger event buffer time (0.5s)
-	  -d, --depth=   depth of watch (1)
+	      --delay=   Trigger event buffer time (0.5s)
+	  -d, --depth=   depth of watch (3)
+	  -e, --ext=     only watch specfied ext file (go,py,c,rb,cpp,cxx,h)
+	  -p, --path=    watch path, support multi -p
+	
+	Help Options:
+	  -h, --help     Show this help message
 
 ## Friendly link: 
 * [bee](https://github.com/astaxie/bee)
