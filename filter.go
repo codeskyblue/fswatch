@@ -107,8 +107,7 @@ func filter(watch chan *fsnotify.FileEvent, funcs ...FilterFunc) chan *fsnotify.
 				//name := reflect.ValueOf(filterFunc).Type().Name()
 				//logs.Warn("func name", name)
 				n := filterFunc(ev)
-
-				logs.Debug("filter: ", GetFunctionName(n), "action: ", n)
+				//logs.Debug("filter", i, "action:", n)
 				if n == FALLTHROUGH {
 					continue
 				} else if n == REJECT {

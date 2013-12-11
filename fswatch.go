@@ -110,10 +110,10 @@ func execute(e chan *fsnotify.FileEvent, origCmd *exec.Cmd) {
 		} else {
 			go func(cmd *exec.Cmd) {
 				_ = cmd
-				//err := cmd.Wait()
-				//if err != nil {
-				//	logs.Warn(err)
-				//}
+				err := cmd.Wait()
+				if err != nil {
+					logs.Warn(err)
+				}
 				termsize.Println(StringCenter(" E-N-D ", TermSize))
 			}(cmd)
 		}
