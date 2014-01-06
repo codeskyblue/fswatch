@@ -3,6 +3,8 @@
 package termsize
 
 import (
+	"fmt"
+	"github.com/aybabtme/color"
 	"syscall"
 	"unsafe"
 )
@@ -25,4 +27,11 @@ func GetTerminalColumns() int {
 	}
 
 	return 80
+}
+
+var brush = color.NewBrush("", color.GreenPaint)
+
+func Println(s ...interface{}) {
+	p := fmt.Sprint(s...)
+	fmt.Println(brush(p))
 }
