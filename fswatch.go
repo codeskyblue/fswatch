@@ -49,7 +49,6 @@ func NewEvent(paths []string, depth int) chan *fsnotify.FileEvent {
 	if err != nil {
 		logs.Fatalf("fail to create new Watcher: %s", err)
 	}
-	logs.Info("Initial watcher")
 
 	for _, path := range paths {
 		logs.Debugf("watch directory: %s", path)
@@ -154,9 +153,9 @@ func main() {
 	if len(opts.Paths) == 0 {
 		opts.Paths = append(opts.Paths, ".")
 	}
-	logs.Info(opts.Paths)
+	logs.Info("Warch paths:", opts.Paths)
 
 	LangExts = strings.Split(opts.Exts, ",")
-	logs.Info(LangExts)
+	logs.Info("Watch extentions:", LangExts)
 	Watch(NewEvent(opts.Paths, opts.Depth))
 }
