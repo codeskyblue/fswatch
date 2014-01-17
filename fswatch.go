@@ -70,21 +70,36 @@ func NewEvent(paths []string, depth int) chan *fsnotify.FileEvent {
 	return watcher.Event
 }
 
-func execute(e chan *fsnotify.FileEvent, origCmd *exec.Cmd) {
-	var cmd *exec.Cmd
+var running = false
+var runChannel = make(chan bool)
+
+func drainExec(name string, args ...string) {
+	for {
+		<-runChannel
+		termsize.Println(StringCenter(" START ", TermSize))
+		cmd := exec.Command(name, args...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stdout
+		err := cmd.Run()
+		if err != nil {
+			logs.Error(err)
+		}
+		termsize.Println(StringCenter(" END ", TermSize))
+	}
+}
+
+func Watch(e chan *fsnotify.FileEvent) {
 	// filter useless event
 	filterEvent := filter(e,
 		hiddenFilter,
 		extentionFilter,
-		gitignoreFilter)
+		gitignoreFilter,
+		deleteRenameFilter,
+		md5CheckFileter)
 
-	// let first time, do command
-	go func() {
-		filterEvent <- &fsnotify.FileEvent{}
-	}()
 	for {
 		ev := <-filterEvent
-		logs.Info("Sense first:", ev)
+		logs.Info("Sense first: ", ev)
 	CHECK:
 		select {
 		case ev = <-filterEvent:
@@ -92,37 +107,16 @@ func execute(e chan *fsnotify.FileEvent, origCmd *exec.Cmd) {
 			goto CHECK
 		case <-time.After(notifyDelay):
 		}
-		// stop cmd
-		if cmd != nil && cmd.Process != nil {
-			logs.Info("stop process")
-			if err := cmd.Process.Kill(); err != nil {
-				logs.Warn(err)
-			}
-		}
-		// create new cmd
-		newCmd := *origCmd
-		cmd = &newCmd
-		termsize.Println(StringCenter(" START ", TermSize))
-		err := cmd.Start()
-		if err != nil {
-			logs.Error(err)
-			continue
-		} else {
-			go func(cmd *exec.Cmd) {
-				_ = cmd
-				err := cmd.Wait()
-				if err != nil {
-					logs.Warn(err)
-				}
-				termsize.Println(StringCenter(" E-N-D ", TermSize))
-			}(cmd)
+		select {
+		case runChannel <- true:
+		default:
 		}
 	}
 }
 
 var opts struct {
 	Verbose bool     `short:"v" long:"verbose" description:"Show verbose debug infomation"`
-	Delay   string   `long:"delay" description:"Trigger event buffer time" default:"0.5s"`
+	Delay   string   `long:"delay" description:"Trigger event buffer time" default:"0.1s"`
 	Depth   int      `short:"d" long:"depth" description:"depth of watch" default:"3"`
 	Exts    string   `short:"e" long:"ext" description:"only watch specfied ext file" default:"go,py,c,rb,cpp,cxx,h"`
 	Paths   []string `short:"p" long:"path" description:"watch path, support multi -p"`
@@ -155,9 +149,7 @@ func main() {
 	if err != nil {
 		logs.Fatal(err)
 	}
-	cmd := exec.Command(args[0], args[1:]...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	go drainExec(args[0], args[1:]...)
 
 	if len(opts.Paths) == 0 {
 		opts.Paths = append(opts.Paths, ".")
@@ -166,6 +158,5 @@ func main() {
 
 	LangExts = strings.Split(opts.Exts, ",")
 	logs.Info(LangExts)
-	event := NewEvent(opts.Paths, opts.Depth)
-	execute(event, cmd)
+	Watch(NewEvent(opts.Paths, opts.Depth))
 }

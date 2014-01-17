@@ -2,6 +2,10 @@
 package main
 
 import (
+	"crypto/md5"
+	"fmt"
+	"io"
+	"log"
 	"os"
 	"reflect"
 	"runtime"
@@ -10,7 +14,7 @@ import (
 	"github.com/shxsun/fswatch/termsize"
 )
 
-// center string in center
+// center string in center(this is a good string)
 func StringCenter(s string, count int, padding ...string) string {
 	c := "="
 	if len(padding) != 0 {
@@ -42,4 +46,27 @@ func getFileInfo(path string) (fi os.FileInfo, err error) {
 
 func GetFunctionName(i interface{}) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
+}
+
+func Md5sum(data []byte) string {
+	h := md5.New()
+	_, err := h.Write(data)
+	if err != nil {
+		log.Println("Md5sum error: %s", err)
+	}
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+// still have space to accelerate
+func Md5sumFile(filename string) (sum string, err error) {
+	fd, err := os.Open(filename)
+	if err != nil {
+		return
+	}
+	h := md5.New()
+	_, err = io.Copy(h, fd)
+	if err != nil {
+		return
+	}
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
