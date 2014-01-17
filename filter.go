@@ -74,7 +74,6 @@ func extentionFilter(ev *fsnotify.FileEvent) Action {
 func hiddenFilter(ev *fsnotify.FileEvent) Action {
 	basename := filepath.Base(ev.Name)
 	if strings.HasPrefix(basename, ".") {
-		//logs.Warn("hidden file", ev.Name)
 		return ACTION_REJECT
 	}
 	return ACTION_CONTINUE
@@ -101,7 +100,7 @@ func md5CheckFileter(ev *fsnotify.FileEvent) Action {
 		logs.Error(err)
 		return ACTION_CONTINUE
 	}
-	logs.Infof("md5file: %s, sum: %s", name, sum)
+	logs.Debugf("md5file: %s, sum: %s", name, sum)
 	oldsum, exists := md5sumMap[name]
 	if sum != oldsum {
 		md5sumMap[name] = sum
