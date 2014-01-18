@@ -10,7 +10,6 @@ import (
 
 	"github.com/howeyc/fsnotify"
 	"github.com/jessevdk/go-flags"
-	"github.com/shxsun/fswatch/termsize"
 	"github.com/shxsun/klog"
 )
 
@@ -69,27 +68,19 @@ func NewEvent(paths []string, depth int) chan *fsnotify.FileEvent {
 	return watcher.Event
 }
 
-var running = false
-var runChannel = make(chan bool)
-
-func drainExec(name string, args ...string) {
+func delayEvent(event chan *fsnotify.FileEvent, notifyDelay time.Duration) {
 	for {
-		<-runChannel
-		termsize.Println(StringCenter(" START ", TermSize))
-		cmd := exec.Command(name, args...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stdout
-		err := cmd.Run()
-		if err != nil {
-			logs.Error(err)
+		select {
+		case <-event: //filterEvent:
+			continue
+		case <-time.After(notifyDelay):
+			return
 		}
-		termsize.Println(StringCenter(" END ", TermSize))
 	}
 }
 
 func Watch(e chan *fsnotify.FileEvent) {
-	// filter useless event
-	filterEvent := filter(e,
+	filterEvent := filter(e, // filter useless event
 		hiddenFilter,
 		extentionFilter,
 		gitignoreFilter,
@@ -99,13 +90,8 @@ func Watch(e chan *fsnotify.FileEvent) {
 	for {
 		ev := <-filterEvent
 		logs.Info("Sense first: ", ev)
-	CHECK:
-		select {
-		case ev = <-filterEvent:
-			logs.Info("Sense again: ", ev)
-			goto CHECK
-		case <-time.After(notifyDelay):
-		}
+		delayEvent(filterEvent, notifyDelay)
+
 		select {
 		case runChannel <- true:
 		default:

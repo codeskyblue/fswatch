@@ -139,14 +139,13 @@ func filter(watch chan *fsnotify.FileEvent, funcs ...FilterFunc) chan *fsnotify.
 			ev := <-watch
 			for _, filterFunc := range funcs {
 				n := filterFunc(ev)
-				logs.Debugf("filter func: %s action:%d",
+				logs.Debugf("finish filter func: %s action:%d",
 					GetFunctionName(filterFunc), n)
 				//logs.Debugf("event: %s", ev)
 				if n == ACTION_CONTINUE {
 					continue
 				} else if n == ACTION_REJECT {
 					goto AGAIN
-					//break2 = true
 					break
 				} else if n == ACTION_ACCEPT {
 					filterd <- ev
