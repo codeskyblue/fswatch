@@ -44,6 +44,11 @@ func goDrainScreen() {
 			screenLock.Lock()
 			cur = (cur + 1) % headHeight
 			toplines[cur] = line
+
+			ansiterm.MoveToXY(0, 0)
+			ansiterm.ClearLine()
+			fmt.Println("fswatch:", opts.Paths, "--", args)
+
 			field.SetRCW(2, 0, termsize.Width()*headHeight)
 			field.Erase()
 			for i := 0; i < headHeight; i++ {
@@ -143,11 +148,15 @@ var opts struct {
 	Paths   []string `short:"p" long:"path" description:"watch path, support multi -p"`
 }
 
+var (
+	args []string
+)
+
 func main() {
 	parser := flags.NewParser(&opts, flags.Default|flags.PassAfterNonOption)
 	parser.Usage = "fswatch [OPTION] command [args...]"
-	args, err := parser.Parse()
-
+	var err error
+	args, err = parser.Parse()
 	if err != nil {
 		os.Exit(1)
 	}
@@ -179,7 +188,6 @@ func main() {
 	if len(opts.Paths) == 0 {
 		opts.Paths = append(opts.Paths, ".")
 	}
-	fmt.Println("fswatch:", opts.Paths, "--", args)
 
 	LangExts = strings.Split(opts.Exts, ",")
 	logs.Info("Watch extentions:", LangExts)
