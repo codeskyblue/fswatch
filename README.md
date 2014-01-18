@@ -13,6 +13,9 @@ fswatch will follow 3 steps.
 ## How to use
 *I will show you an example*
 
+* Demo Video <http://www.tudou.com/programs/view/NMOOE-Lj5Sc/>
+* Demo video(no voice) <http://asciinema.org/a/7247>
+
 ```
 go get github.com/shxsun/fswatch
 # cd to a golang project
@@ -29,7 +32,7 @@ touch test.go
 
 ## Shell help
 	Usage:
-	  fswatch [OPTIONS]
+	  fswatch [OPTIONS] command [args...]
 	
 	Application Options:
 	  -v, --verbose  Show verbose debug infomation
