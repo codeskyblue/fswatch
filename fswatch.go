@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,14 +13,47 @@ import (
 
 	"github.com/howeyc/fsnotify"
 	"github.com/jessevdk/go-flags"
+	"github.com/shxsun/ansiterm"
+	"github.com/shxsun/fswatch/termsize"
 	"github.com/shxsun/klog"
 )
 
 var (
-	logs        = klog.DevLog.SetLevel(klog.LInfo)
+	reader, writer = io.Pipe()
+	screen         = NewBufReader(reader)
+	logs           = klog.NewLogger(writer, "").
+			SetLevel(klog.LInfo).SetFlags(klog.Fdevflag)
 	notifyDelay time.Duration
 	LangExts    []string
+	headHeight  = 4
+	sepLine     = 5
 )
+
+func goDrainScreen() {
+	toplines := make([]string, headHeight)
+	cur := -1
+	field := new(ansiterm.ScreenField)
+	field.SetRCW(2, 0, termsize.Width()*headHeight)
+	scrbuf := bufio.NewReader(screen)
+	go func() {
+		for {
+			line, err := scrbuf.ReadString('\n')
+			if err != nil && err != io.EOF {
+				log.Println(err)
+				return
+			}
+			screenLock.Lock()
+			cur = (cur + 1) % headHeight
+			toplines[cur] = line
+			field.Erase()
+			for i := 0; i < headHeight; i++ {
+				index := (cur + i) % headHeight
+				fmt.Print(toplines[index])
+			}
+			screenLock.Unlock()
+		}
+	}()
+}
 
 // Add dir and children (recursively) to watcher
 func watchDirAndChildren(w *fsnotify.Watcher, path string, depth int) error {
@@ -134,12 +170,15 @@ func main() {
 	if err != nil {
 		logs.Fatal(err)
 	}
+
+	ansiterm.ClearPage()
 	go drainExec(args[0], args[1:]...)
+	goDrainScreen()
 
 	if len(opts.Paths) == 0 {
 		opts.Paths = append(opts.Paths, ".")
 	}
-	logs.Info("Warch paths:", opts.Paths)
+	fmt.Println("fswatch:", opts.Paths, "--", args)
 
 	LangExts = strings.Split(opts.Exts, ",")
 	logs.Info("Watch extentions:", LangExts)

@@ -16,7 +16,7 @@ import (
 
 // center string in center(this is a good string)
 func StringCenter(s string, count int, padding ...string) string {
-	c := "="
+	c := "-"
 	if len(padding) != 0 {
 		c = padding[0]
 	}

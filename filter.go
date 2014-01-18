@@ -82,7 +82,7 @@ func hiddenFilter(ev *fsnotify.FileEvent) Action {
 // if delete or rename, just accept
 func deleteRenameFilter(ev *fsnotify.FileEvent) Action {
 	if ev.IsDelete() || ev.IsRename() {
-		return ACTION_REJECT
+		return ACTION_CONTINUE
 	}
 	return ACTION_CONTINUE
 }
@@ -98,7 +98,7 @@ func md5CheckFileter(ev *fsnotify.FileEvent) Action {
 	sum, err := Md5sumFile(name)
 	if err != nil {
 		logs.Error(err)
-		return ACTION_CONTINUE
+		//return ACTION_CONTINUE
 	}
 	logs.Debugf("md5file: %s, sum: %s", name, sum)
 	oldsum, exists := md5sumMap[name]
