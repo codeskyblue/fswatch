@@ -1,5 +1,6 @@
 # fswatch
 [![Build Status](https://drone.io/github.com/shxsun/fswatch/status.png)](https://drone.io/github.com/shxsun/fswatch/latest)
+[![Total views](https://sourcegraph.com/api/repos/github.com/shxsun/fswatch/counters/views.png)](https://sourcegraph.com/github.com/shxsun/fswatch)
 
 A definition of **fswatch**: Command line tool. Use file system event to trigger user defined commands. 
 
