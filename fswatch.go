@@ -22,7 +22,7 @@ var (
 	reader, writer = io.Pipe()
 	screen         = NewBufReader(reader)
 	logs           = klog.NewLogger(writer, "").
-			SetLevel(klog.LInfo).SetFlags(klog.Fdevflag)
+			SetLevel(klog.LInfo).SetFlags(klog.Fstdflag)
 	notifyDelay time.Duration
 	LangExts    []string
 	headHeight  = 4
@@ -33,7 +33,6 @@ func goDrainScreen() {
 	toplines := make([]string, headHeight)
 	cur := -1
 	field := new(ansiterm.ScreenField)
-	field.SetRCW(2, 0, termsize.Width()*headHeight)
 	scrbuf := bufio.NewReader(screen)
 	go func() {
 		for {
@@ -45,9 +44,10 @@ func goDrainScreen() {
 			screenLock.Lock()
 			cur = (cur + 1) % headHeight
 			toplines[cur] = line
+			field.SetRCW(2, 0, termsize.Width()*headHeight)
 			field.Erase()
 			for i := 0; i < headHeight; i++ {
-				index := (cur + i) % headHeight
+				index := (cur - i + headHeight) % headHeight
 				fmt.Print(toplines[index])
 			}
 			screenLock.Unlock()
@@ -145,6 +145,7 @@ var opts struct {
 
 func main() {
 	parser := flags.NewParser(&opts, flags.Default|flags.PassAfterNonOption)
+	parser.Usage = "fswatch [OPTION] command [args...]"
 	args, err := parser.Parse()
 
 	if err != nil {

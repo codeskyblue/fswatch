@@ -16,13 +16,13 @@ var screenLock = &sync.Mutex{}
 
 func drainExec(name string, args ...string) {
 	cmdFiled := &ansiterm.ScreenField{}
-	cmdFiled.SetRCW(sepLine+1, 0, termsize.Width()*(termsize.Height()-sepLine))
 	var execTimes = 0
 	for {
 		<-runChannel
 
 		screenLock.Lock()
 		//ansiterm.SetBGColor(1)
+		cmdFiled.SetRCW(sepLine+1, 0, termsize.Width()*(termsize.Height()-sepLine))
 		ansiterm.MoveToXY(6, 0)
 		cmdFiled.Erase()
 
