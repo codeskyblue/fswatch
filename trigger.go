@@ -23,8 +23,10 @@ func drainExec(name string, args ...string) {
 		screenLock.Lock()
 		//ansiterm.SetBGColor(1)
 		cmdFiled.SetRCW(sepLine+1, 0, termsize.Width()*(termsize.Height()-sepLine))
-		ansiterm.MoveToXY(6, 0)
-		cmdFiled.Erase()
+		if !opts.Verbose {
+			ansiterm.MoveToXY(6, 0)
+			cmdFiled.Erase()
+		}
 
 		execTimes += 1
 		prompt := fmt.Sprintf(" Start(%d) ", execTimes)

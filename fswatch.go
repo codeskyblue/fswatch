@@ -21,7 +21,7 @@ import (
 var (
 	reader, writer = io.Pipe()
 	screen         = NewBufReader(reader)
-	logs           = klog.NewLogger(writer, "").
+	lg             = klog.NewLogger(writer, "").
 			SetLevel(klog.LInfo).SetFlags(klog.Fstdflag)
 	notifyDelay time.Duration
 	LangExts    []string
@@ -45,12 +45,18 @@ func goDrainScreen() {
 			cur = (cur + 1) % headHeight
 			toplines[cur] = line
 
-			ansiterm.MoveToXY(0, 0)
-			ansiterm.ClearLine()
+			if !opts.Verbose {
+				ansiterm.MoveToXY(0, 0)
+				ansiterm.ClearLine()
+			}
 			fmt.Println("fswatch:", opts.Paths, "--", args)
 
-			field.SetRCW(2, 0, termsize.Width()*headHeight)
-			field.Erase()
+			if !opts.Verbose {
+				field.SetRCW(2, 0, termsize.Width()*headHeight)
+			}
+			if !opts.Verbose {
+				field.Erase()
+			}
 			for i := 0; i < headHeight; i++ {
 				index := (cur - i + headHeight) % headHeight
 				fmt.Print(toplines[index])
@@ -68,6 +74,10 @@ func watchDirAndChildren(w *fsnotify.Watcher, path string, depth int) error {
 	baseNumSeps := strings.Count(path, string(os.PathSeparator))
 	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
+			if strings.HasPrefix(".", info.Name()) { // ignore hidden dir
+				return filepath.SkipDir
+			}
+
 			pathDepth := strings.Count(path, string(os.PathSeparator)) - baseNumSeps
 			if pathDepth > depth {
 				return filepath.SkipDir
@@ -87,22 +97,21 @@ func watchDirAndChildren(w *fsnotify.Watcher, path string, depth int) error {
 func NewEvent(paths []string, depth int) chan *fsnotify.FileEvent {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		logs.Fatalf("fail to create new Watcher: %s", err)
+		log.Fatalf("fail to create new Watcher: %s", err)
 	}
-
 	for _, path := range paths {
-		logs.Debugf("watch directory: %s", path)
+		lg.Debugf("watch directory: %s", path)
 		err = watchDirAndChildren(watcher, path, depth)
 		if err != nil {
-			logs.Fatalf("failed to watch directory: %s", err)
+			lg.Error(err)
 		}
 	}
 
 	// ignore watcher error
 	go func() {
 		for {
-			err := <-watcher.Error             // ignore watcher error
-			logs.Warnf("watch error: %s", err) // No need to exit here
+			err := <-watcher.Error           // ignore watcher error
+			lg.Warnf("watch error: %s", err) // No need to exit here
 		}
 	}()
 
@@ -130,7 +139,7 @@ func Watch(e chan *fsnotify.FileEvent) {
 
 	for {
 		ev := <-filterEvent
-		logs.Info("Sense first: ", ev)
+		lg.Info("Sense first: ", ev)
 		delayEvent(filterEvent, notifyDelay)
 
 		select {
@@ -161,14 +170,14 @@ func main() {
 		os.Exit(1)
 	}
 	if opts.Verbose {
-		logs.SetLevel(klog.LDebug)
+		lg.SetLevel(klog.LDebug)
 	}
 	notifyDelay, err = time.ParseDuration(opts.Delay)
 	if err != nil {
-		logs.Warn(err)
+		lg.Warn(err)
 		notifyDelay = time.Millisecond * 500
 	}
-	logs.Debugf("delay time: %s", notifyDelay)
+	lg.Debugf("delay time: %s", notifyDelay)
 
 	if len(args) == 0 {
 		fmt.Printf("Use %s --help for more details\n", os.Args[0])
@@ -178,10 +187,12 @@ func main() {
 	// check if cmd exists
 	_, err = exec.LookPath(args[0])
 	if err != nil {
-		logs.Fatal(err)
+		lg.Fatal(err)
 	}
 
-	ansiterm.ClearPage()
+	if !opts.Verbose {
+		ansiterm.ClearPage()
+	}
 	go drainExec(args[0], args[1:]...)
 	goDrainScreen()
 
@@ -190,6 +201,7 @@ func main() {
 	}
 
 	LangExts = strings.Split(opts.Exts, ",")
-	logs.Info("Watch extentions:", LangExts)
-	Watch(NewEvent(opts.Paths, opts.Depth))
+	lg.Info("Watch extentions:", LangExts)
+	event := NewEvent(opts.Paths, opts.Depth)
+	Watch(event)
 }

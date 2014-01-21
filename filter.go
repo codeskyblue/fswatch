@@ -29,7 +29,7 @@ func loadGitignore(filename string) []*regexp.Regexp {
 	ignores := make([]*regexp.Regexp, 0, 20)
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
-		logs.Debugf("file '%s' open failed", filename)
+		lg.Debugf("file '%s' open failed", filename)
 		return nil
 	}
 
@@ -45,10 +45,10 @@ func loadGitignore(filename string) []*regexp.Regexp {
 			line = "^" + line + "$"
 			r, err := regexp.Compile(line)
 			if err != nil {
-				logs.Error(err)
+				lg.Error(err)
 				continue
 			}
-			logs.Debug("init: ", line)
+			lg.Debug("init: ", line)
 			ignores = append(ignores, r)
 		}
 	}
@@ -97,10 +97,10 @@ func md5CheckFileter(ev *fsnotify.FileEvent) Action {
 	name := ev.Name
 	sum, err := Md5sumFile(name)
 	if err != nil {
-		logs.Error(err)
+		lg.Error(err)
 		//return ACTION_CONTINUE
 	}
-	logs.Debugf("md5file: %s, sum: %s", name, sum)
+	lg.Debugf("md5file: %s, sum: %s", name, sum)
 	oldsum, exists := md5sumMap[name]
 	if sum != oldsum {
 		md5sumMap[name] = sum
@@ -121,7 +121,7 @@ func gitignoreFilter(ev *fsnotify.FileEvent) Action {
 	}
 	for _, patten := range ignorePattens {
 		if patten.MatchString(s) {
-			logs.Debugf("patten %s match %s",
+			lg.Debugf("patten %s match %s",
 				strconv.Quote(patten.String()),
 				strconv.Quote(s))
 			return ACTION_REJECT
@@ -139,9 +139,9 @@ func filter(watch chan *fsnotify.FileEvent, funcs ...FilterFunc) chan *fsnotify.
 			ev := <-watch
 			for _, filterFunc := range funcs {
 				n := filterFunc(ev)
-				logs.Debugf("finish filter func: %s action:%d",
+				lg.Debugf("finish filter func: %s action:%d",
 					GetFunctionName(filterFunc), n)
-				//logs.Debugf("event: %s", ev)
+				//lg.Debugf("event: %s", ev)
 				if n == ACTION_CONTINUE {
 					continue
 				} else if n == ACTION_REJECT {
@@ -155,17 +155,17 @@ func filter(watch chan *fsnotify.FileEvent, funcs ...FilterFunc) chan *fsnotify.
 
 			fi, err := getFileInfo(ev.Name)
 			if err != nil {
-				//logs.Warnf("get file mod time failed: %s", err)
+				//lg.Warnf("get file mod time failed: %s", err)
 				continue
 			}
 			if fi.IsDir() { // ignore directory changes
-				logs.Debugf("Dir ignore: %s", ev.Name)
+				lg.Debugf("Dir ignore: %s", ev.Name)
 				continue
 			}
 
 			mt := fi.ModTime().Unix()
 			if mt == modifyTime[ev.Name] {
-				logs.Debugf("SKIP: %s", ev.Name)
+				lg.Debugf("SKIP: %s", ev.Name)
 				continue
 			}
 
