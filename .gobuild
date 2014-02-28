@@ -1,0 +1,6 @@
+---
+filesets:
+    includes:
+        - README.md
+        - LICENSE
+        - CHANGELOG

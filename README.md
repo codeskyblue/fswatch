@@ -4,11 +4,10 @@
 
 **fswatch** is a command tool. Use file system event to trigger user defined commands. 
 
-
 fswatch will follow 3 steps.
 
 1. notify if file under current directory changes.
-2. filter event by `.gitignore`
+2. filter event by `.gitignore` (if no .gitignore, the goto step 3)
 3. do user defined commands(passed by commands)
 
 ## How to use
