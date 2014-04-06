@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -22,6 +23,10 @@ func init() {
 	log.SetFlags(0)
 	log.SetPrefix("\033[32mfswatch\033[0m >>> ")
 }
+
+var (
+	verbose = flag.Bool("v", false, "show verbose")
+)
 
 type gowatch struct {
 	Paths         []string `json:"paths"`
@@ -75,7 +80,9 @@ func (this *gowatch) watchDirAndChildren(path string) error {
 			if pathDepth > this.Depth {
 				return filepath.SkipDir
 			}
-			//fmt.Println(">>> watch dir: ", path)
+			if *verbose {
+				fmt.Println(">>> watch dir: ", path)
+			}
 			if err := this.w.Watch(path); err != nil {
 				return err
 			}
@@ -208,6 +215,7 @@ func delayEvent(event chan *fsnotify.FileEvent, notifyDelay time.Duration) {
 const JSONCONF = ".fswatch.json"
 
 func main() {
+	flag.Parse()
 	gw := &gowatch{
 		Paths:   []string{"."},
 		Depth:   3,
