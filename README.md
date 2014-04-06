@@ -4,45 +4,20 @@
 
 **fswatch** is a command tool. Use file system event to trigger user defined commands. 
 
-fswatch will follow 3 steps.
+I reviewed the first version of fswatch(which was taged 0.2). The code I look now is shit. So I deleted almost 80% code, And left some very useful functions.
 
-1. notify if file under current directory changes.
-2. filter event by `.gitignore` (if no .gitignore, the goto step 3)
-3. do user defined commands(passed by commands)
+This version is works fine on mac and linux. Sorry for windows.
 
 ## How to use
-*I will show you an example*
+first you need to install it by the following command.
 
-* Demo Video <http://www.tudou.com/programs/view/NMOOE-Lj5Sc/>
-* Demo video(no voice) <http://asciinema.org/a/7247>
+	go get github.com/shxsun/fswatch
 
-```
-go get github.com/shxsun/fswatch
-# cd to a golang project
-# ...
-fswatch go test
+create a `.fswatch.json` file, which can be created by run `fswatch`
 
-# open a new shell, cd to the same place
-touch test.go
+modify `.fswatch.json`
 
-# now fswatch should do some tests. (if nothing happens, tell me)
-```
-
-![fswatch](images/fswatch.png)
-
-## Shell help
-	Usage:
-	  fswatch [OPTIONS] command [args...]
-	
-	Application Options:
-	  -v, --verbose  Show verbose debug infomation
-	      --delay=   Trigger event buffer time (0.5s)
-	  -d, --depth=   depth of watch (3)
-	  -e, --ext=     only watch specfied ext file (go,py,c,rb,cpp,cxx,h)
-	  -p, --path=    watch path, support multi -p
-	
-	Help Options:
-	  -h, --help     Show this help message
+call `fswatch` again.
 
 ## Friendly link: 
 * [bee](https://github.com/astaxie/bee)

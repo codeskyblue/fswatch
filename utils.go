@@ -2,44 +2,36 @@
 package main
 
 import (
-	"crypto/md5"
 	"fmt"
-	"io"
-	"os"
+	"os/exec"
 	"reflect"
 	"runtime"
+	"strconv"
+
+	"github.com/gobuild/log"
+	"github.com/shxsun/go-sh"
 )
 
-func getFileInfo(path string) (fi os.FileInfo, err error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return
+func groupKill(cmd *exec.Cmd) (err error) {
+	log.Println("\033[33mprogram terminated\033[0m")
+	var pid, pgid int
+	if cmd.Process != nil {
+		pid = cmd.Process.Pid
+		c := sh.Command("/bin/ps", "-o", "pgid", "-p", strconv.Itoa(pid)).Command("sed", "-n", "2,$p")
+		var out []byte
+		out, err = c.Output()
+		if err != nil {
+			return
+		}
+		_, err = fmt.Sscanf(string(out), "%d", &pgid)
+		if err != nil {
+			return
+		}
+		err = exec.Command("/bin/kill", "-TERM", "-"+strconv.Itoa(pgid)).Run()
 	}
-	defer f.Close()
-	fi, err = f.Stat()
 	return
 }
 
 func GetFunctionName(i interface{}) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
-}
-
-func Md5sum(data []byte) string {
-	h := md5.New()
-	h.Write(data)
-	return fmt.Sprintf("%x", h.Sum(nil))
-}
-
-// still have space to accelerate
-func Md5sumFile(filename string) (sum string, err error) {
-	fd, err := os.Open(filename)
-	if err != nil {
-		return
-	}
-	h := md5.New()
-	_, err = io.Copy(h, fd)
-	if err != nil {
-		return
-	}
-	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }

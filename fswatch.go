@@ -6,35 +6,60 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/gobuild/log"
 	"github.com/howeyc/fsnotify"
 )
 
-type gowatch struct {
-	Path           string        `json:"path"`
-	Depth          int           `json:"depth"`
-	Include        string        `json:"include"`
-	Exclude        string        `json:"exclude"`
-	BufferDuration string        `json:"buffer-duration"`
-	bufdur         time.Duration `json:"-"`
+func init() {
+	log.SetFlags(0)
+	log.SetPrefix("\033[32mfswatch\033[0m >>> ")
+}
 
+type gowatch struct {
+	Paths         []string `json:"paths"`
+	Depth         int      `json:"depth"`
+	Exclude       []string `json:"exclude"`
+	reExclude     []*regexp.Regexp
+	Include       []string `json:"include"`
+	reInclude     []*regexp.Regexp
+	bufdur        time.Duration     `json:"-"`
 	Command       []string          `json:"command"`
 	Env           map[string]string `json:"env"`
 	EnableRestart bool              `json:"enable-restart"`
+	//BufferDuration string        `json:"buffer-duration"`
 
-	w       *fsnotify.Watcher `json:"-"`
+	w       *fsnotify.Watcher
 	modtime map[string]time.Time
 	sig     chan string
+	sigOS   chan os.Signal
+}
+
+func (this *gowatch) match(file string) bool {
+	file = filepath.Base(file)
+	for _, rule := range this.reExclude {
+		if rule.MatchString(file) {
+			return false
+		}
+	}
+	for _, rule := range this.reInclude {
+		if rule.MatchString(file) {
+			return true
+		}
+	}
+	return len(this.reInclude) == 0 // if empty include, then return true
 }
 
 // Add dir and children (recursively) to watcher
-func (this *gowatch) watchDirAndChildren() error {
-	path := this.Path
+func (this *gowatch) watchDirAndChildren(path string) error {
+	//path := this.Path
 	if err := this.w.Watch(path); err != nil {
 		return err
 	}
@@ -50,7 +75,7 @@ func (this *gowatch) watchDirAndChildren() error {
 			if pathDepth > this.Depth {
 				return filepath.SkipDir
 			}
-			fmt.Println(">>> watch dir: ", path)
+			//fmt.Println(">>> watch dir: ", path)
 			if err := this.w.Watch(path); err != nil {
 				return err
 			}
@@ -60,17 +85,26 @@ func (this *gowatch) watchDirAndChildren() error {
 }
 
 func (this *gowatch) Watch() (err error) {
-	w, err := fsnotify.NewWatcher()
-	if err != nil {
+	if this.w, err = fsnotify.NewWatcher(); err != nil {
 		return
 	}
-	this.w = w
-	err = this.watchDirAndChildren()
-	if err != nil {
-		return
+	for _, path := range this.Paths {
+		if err = this.watchDirAndChildren(os.ExpandEnv(path)); err != nil {
+			log.Fatal(err)
+		}
 	}
 	this.modtime = make(map[string]time.Time)
 	this.sig = make(chan string)
+	for _, patten := range this.Exclude {
+		this.reExclude = append(this.reExclude, regexp.MustCompile(patten))
+	}
+	for _, patten := range this.Include {
+		this.reInclude = append(this.reInclude, regexp.MustCompile(patten))
+	}
+
+	this.sigOS = make(chan os.Signal, 1)
+	signal.Notify(this.sigOS, syscall.SIGINT)
+
 	go this.drainExec()
 	this.drainEvent()
 	return
@@ -86,7 +120,7 @@ func (this *gowatch) drainEvent() {
 		eve := <-this.w.Event
 		log.Debug(eve)
 		changed := this.IsfileChanged(eve.Name)
-		if changed {
+		if changed && this.match(eve.Name) {
 			log.Info(eve)
 			select {
 			case this.sig <- "KILL":
@@ -109,6 +143,7 @@ func (this *gowatch) IsfileChanged(p string) bool {
 }
 
 func (this *gowatch) drainExec() {
+	log.Println("command:", this.Command)
 	for {
 		startTime := time.Now()
 		cmd := this.Command
@@ -118,15 +153,22 @@ func (this *gowatch) drainExec() {
 		c := exec.Command(cmd[0], cmd[1:]...)
 		c.Stdout = os.Stdout
 		c.Stderr = os.Stdout
+
+		c.SysProcAttr = &syscall.SysProcAttr{}
+		c.SysProcAttr.Setpgid = true
+
 		err := c.Start()
 		if err != nil {
 			log.Warn(err)
 		}
 		select {
 		case <-this.sig:
-			if c.Process != nil {
-				c.Process.Kill()
+			if err := groupKill(c); err != nil {
+				log.Error(err)
 			}
+		case <-this.sigOS:
+			groupKill(c)
+			os.Exit(1)
 		case err = <-Go(c.Wait):
 			if err != nil {
 				log.Warn(err)
@@ -135,7 +177,12 @@ func (this *gowatch) drainExec() {
 		if time.Since(startTime) > time.Second*3 {
 			continue
 		}
-		<-this.sig
+		// wait signal
+		select {
+		case <-this.sig:
+		case <-this.sigOS:
+			os.Exit(1)
+		}
 	}
 }
 
@@ -161,17 +208,14 @@ func delayEvent(event chan *fsnotify.FileEvent, notifyDelay time.Duration) {
 const JSONCONF = ".fswatch.json"
 
 func main() {
-	notifyDelay, err := time.ParseDuration("1s")
-	if err != nil {
-		notifyDelay = time.Millisecond * 500
+	gw := &gowatch{
+		Paths:   []string{"."},
+		Depth:   3,
+		Command: []string{"echo", "hello fswatch!!!"},
+		Exclude: []string{"~$", "\\.swx$", "\\.exe$"},
+		Include: []string{},
 	}
-	_ = notifyDelay
-	gw := &gowatch{}
-	gw.Path = "."
-	gw.BufferDuration = "1s"
-	gw.Depth = 0
-	gw.Env = map[string]string{"PROGRAM": "fswatch"}
-	gw.Command = []string{"echo", "hello fswatch!!!"}
+	gw.Env = map[string]string{"POWERD_BY": "github.com/shxsun/fswatch"}
 	if fd, err := os.Open(JSONCONF); err == nil {
 		if er := json.NewDecoder(fd).Decode(gw); er != nil {
 			log.Fatal(er)
