@@ -124,14 +124,18 @@ func (this *gowatch) drainEvent() {
 		}
 	}()
 	for {
-		eve := <-this.w.Event
-		log.Debug(eve)
-		changed := this.IsfileChanged(eve.Name)
-		if changed && this.match(eve.Name) {
-			log.Info(eve)
-			select {
-			case this.sig <- "KILL":
-			default:
+		select {
+		case <-this.sigOS:
+			this.sig <- "EXIT"
+		case eve := <-this.w.Event:
+			log.Debug(eve)
+			changed := this.IsfileChanged(eve.Name)
+			if changed && this.match(eve.Name) {
+				log.Info(eve)
+				select {
+				case this.sig <- "KILL":
+				default:
+				}
 			}
 		}
 	}
@@ -151,6 +155,7 @@ func (this *gowatch) IsfileChanged(p string) bool {
 
 func (this *gowatch) drainExec() {
 	log.Println("command:", this.Command)
+	var msg string
 	for {
 		startTime := time.Now()
 		cmd := this.Command
@@ -169,25 +174,25 @@ func (this *gowatch) drainExec() {
 			log.Warn(err)
 		}
 		select {
-		case <-this.sig:
+		case msg = <-this.sig:
 			if err := groupKill(c); err != nil {
 				log.Error(err)
 			}
-		case <-this.sigOS:
-			groupKill(c)
-			os.Exit(1)
+			if msg == "EXIT" {
+				os.Exit(1)
+			}
 		case err = <-Go(c.Wait):
 			if err != nil {
 				log.Warn(err)
+				goto WAIT_SIGNAL
 			}
 		}
-		if time.Since(startTime) > time.Second*3 {
+		if this.EnableRestart || time.Since(startTime) > time.Second*3 {
 			continue
 		}
-		// wait signal
-		select {
-		case <-this.sig:
-		case <-this.sigOS:
+	WAIT_SIGNAL:
+		log.Info("\033[33m-- wait signal --\033[30m")
+		if msg = <-this.sig; msg == "EXIT" {
 			os.Exit(1)
 		}
 	}
