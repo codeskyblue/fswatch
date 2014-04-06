@@ -1,15 +1,18 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gobuild/log"
 	"github.com/howeyc/fsnotify"
-	"github.com/jessevdk/go-flags"
 )
 
 type gowatch struct {
@@ -20,11 +23,13 @@ type gowatch struct {
 	BufferDuration string        `json:"buffer-duration"`
 	bufdur         time.Duration `json:"-"`
 
-	Command       string   `json:"command"`
-	Env           []string `json:"env"`
-	EnableRestart bool     `json:"enable-restart"`
+	Command       []string          `json:"command"`
+	Env           map[string]string `json:"env"`
+	EnableRestart bool              `json:"enable-restart"`
 
-	w *fsnotify.Watcher `json:"-"`
+	w       *fsnotify.Watcher `json:"-"`
+	modtime map[string]time.Time
+	sig     chan string
 }
 
 // Add dir and children (recursively) to watcher
@@ -36,7 +41,8 @@ func (this *gowatch) watchDirAndChildren() error {
 	baseNumSeps := strings.Count(path, string(os.PathSeparator))
 	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
-			if strings.HasPrefix(".", info.Name()) { // ignore hidden dir
+			base := info.Name()
+			if base != "." && strings.HasPrefix(base, ".") { // ignore hidden dir
 				return filepath.SkipDir
 			}
 
@@ -44,6 +50,7 @@ func (this *gowatch) watchDirAndChildren() error {
 			if pathDepth > this.Depth {
 				return filepath.SkipDir
 			}
+			fmt.Println(">>> watch dir: ", path)
 			if err := this.w.Watch(path); err != nil {
 				return err
 			}
@@ -62,18 +69,82 @@ func (this *gowatch) Watch() (err error) {
 	if err != nil {
 		return
 	}
+	this.modtime = make(map[string]time.Time)
+	this.sig = make(chan string)
 	go this.drainExec()
+	this.drainEvent()
 	return
 }
 
-func (this *gowatch) drainWarn() {
+func (this *gowatch) drainEvent() {
+	go func() {
+		for {
+			log.Warnf("watch error: %s", <-this.w.Error)
+		}
+	}()
 	for {
-		err := <-this.w.Error
-		log.Warnf("watch error: %s", err) // No need to exit here
+		eve := <-this.w.Event
+		log.Debug(eve)
+		changed := this.IsfileChanged(eve.Name)
+		if changed {
+			log.Info(eve)
+			select {
+			case this.sig <- "KILL":
+			default:
+			}
+		}
 	}
 }
 
+func (this *gowatch) IsfileChanged(p string) bool {
+	p = filepath.Clean(p)
+	fi, err := os.Stat(p)
+	if err != nil {
+		return true // if file not exists, just return true
+	}
+	curr := fi.ModTime()
+	defer func() { this.modtime[p] = curr }()
+	modt, ok := this.modtime[p]
+	return !ok || curr.After(modt.Add(time.Second))
+}
+
 func (this *gowatch) drainExec() {
+	for {
+		startTime := time.Now()
+		cmd := this.Command
+		if len(cmd) == 0 {
+			cmd = []string{"echo", "no command specified"}
+		}
+		c := exec.Command(cmd[0], cmd[1:]...)
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stdout
+		err := c.Start()
+		if err != nil {
+			log.Warn(err)
+		}
+		select {
+		case <-this.sig:
+			if c.Process != nil {
+				c.Process.Kill()
+			}
+		case err = <-Go(c.Wait):
+			if err != nil {
+				log.Warn(err)
+			}
+		}
+		if time.Since(startTime) > time.Second*3 {
+			continue
+		}
+		<-this.sig
+	}
+}
+
+func Go(f func() error) chan error {
+	ch := make(chan error)
+	go func() {
+		ch <- f()
+	}()
+	return ch
 }
 
 func delayEvent(event chan *fsnotify.FileEvent, notifyDelay time.Duration) {
@@ -87,45 +158,36 @@ func delayEvent(event chan *fsnotify.FileEvent, notifyDelay time.Duration) {
 	}
 }
 
-var opts struct {
-	Verbose bool     `json:"verbose" short:"v" long:"verbose" description:"Show verbose debug infomation"`
-	Delay   string   `json:"timegap" long:"delay" description:"Trigger event buffer time" default:"0.1s"`
-	Depth   int      `json:"depth" short:"d" long:"depth" description:"depth of watch" default:"3"`
-	Paths   []string `json:"paths" short:"p" long:"path" description:"watch path, support multi -p"`
-}
-
-var (
-	args []string
-)
-
-var runChannel = make(chan bool)
-
-func drainExec(name string, args ...string) {
-	for {
-		<-runChannel
-
-		cmd := exec.Command(name, args...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stdout
-		err := cmd.Run()
-		if err != nil {
-			log.Println(err)
-		}
-	}
-}
+const JSONCONF = ".fswatch.json"
 
 func main() {
-	parser := flags.NewParser(&opts, flags.Default|flags.PassAfterNonOption)
-	parser.Usage = "fswatch [OPTION] command [args...]"
-	var err error
-	args, err = parser.Parse()
-	if err != nil {
-		os.Exit(1)
-	}
-
-	notifyDelay, err := time.ParseDuration(opts.Delay)
+	notifyDelay, err := time.ParseDuration("1s")
 	if err != nil {
 		notifyDelay = time.Millisecond * 500
 	}
 	_ = notifyDelay
+	gw := &gowatch{}
+	gw.Path = "."
+	gw.BufferDuration = "1s"
+	gw.Depth = 0
+	gw.Env = map[string]string{"PROGRAM": "fswatch"}
+	gw.Command = []string{"echo", "hello fswatch!!!"}
+	if fd, err := os.Open(JSONCONF); err == nil {
+		if er := json.NewDecoder(fd).Decode(gw); er != nil {
+			log.Fatal(er)
+		}
+		for key, val := range gw.Env {
+			os.Setenv(key, val)
+		}
+		log.Fatal(gw.Watch())
+	} else {
+		fmt.Printf("initial %s file [y/n]: ", JSONCONF)
+		var yn string = "y"
+		fmt.Scan(&yn)
+		if strings.ToUpper(strings.TrimSpace(yn)) == "Y" {
+			data, _ := json.MarshalIndent(gw, "", "    ")
+			ioutil.WriteFile(JSONCONF, data, 0644)
+			fmt.Printf("%s created, use notepad++ or vim to edit it\n", strconv.Quote(JSONCONF))
+		}
+	}
 }
