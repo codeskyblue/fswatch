@@ -118,13 +118,10 @@ func (this *gowatch) Watch() (err error) {
 }
 
 func (this *gowatch) drainEvent() {
-	go func() {
-		for {
-			log.Warnf("watch error: %s", <-this.w.Error)
-		}
-	}()
 	for {
 		select {
+		case err := <-this.w.Error:
+			log.Warnf("watch error: %s", err)
 		case <-this.sigOS:
 			this.sig <- "EXIT"
 		case eve := <-this.w.Event:
@@ -162,6 +159,7 @@ func (this *gowatch) drainExec() {
 		if len(cmd) == 0 {
 			cmd = []string{"echo", "no command specified"}
 		}
+		log.Info("\033[35mexec start\033[0m")
 		c := exec.Command(cmd[0], cmd[1:]...)
 		c.Stdout = os.Stdout
 		c.Stderr = os.Stdout
@@ -191,7 +189,7 @@ func (this *gowatch) drainExec() {
 			continue
 		}
 	WAIT_SIGNAL:
-		log.Info("\033[33m-- wait signal --\033[30m")
+		log.Info("\033[33m-- wait signal --\033[0m")
 		if msg = <-this.sig; msg == "EXIT" {
 			os.Exit(1)
 		}
