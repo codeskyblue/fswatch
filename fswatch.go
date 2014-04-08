@@ -179,6 +179,7 @@ func (this *gowatch) drainExec() {
 			if msg == "EXIT" {
 				os.Exit(1)
 			}
+			goto RESTART
 		case err = <-Go(c.Wait):
 			if err != nil {
 				log.Warn(err)
@@ -193,6 +194,7 @@ func (this *gowatch) drainExec() {
 		if msg = <-this.sig; msg == "EXIT" {
 			os.Exit(1)
 		}
+	RESTART:
 	}
 }
 
