@@ -185,7 +185,7 @@ func (this *gowatch) drainExec() {
 				goto WAIT_SIGNAL
 			}
 		}
-		if this.EnableRestart || time.Since(startTime) > time.Second*3 {
+		if this.EnableRestart && time.Since(startTime) > time.Second*2 {
 			continue
 		}
 	WAIT_SIGNAL:
@@ -221,10 +221,10 @@ func main() {
 	flag.Parse()
 	gw := &gowatch{
 		Paths:   []string{"."},
-		Depth:   3,
+		Depth:   2,
 		Command: []string{"echo", "hello fswatch!!!"},
 		Exclude: []string{"~$", "\\.swx$", "\\.exe$"},
-		Include: []string{},
+		Include: []string{"\\.*$"},
 	}
 	gw.Env = map[string]string{"POWERD_BY": "github.com/shxsun/fswatch"}
 	if fd, err := os.Open(JSONCONF); err == nil {
@@ -242,7 +242,7 @@ func main() {
 		if strings.ToUpper(strings.TrimSpace(yn)) == "Y" {
 			data, _ := json.MarshalIndent(gw, "", "    ")
 			ioutil.WriteFile(JSONCONF, data, 0644)
-			fmt.Printf("%s created, use notepad++ or vim to edit it\n", strconv.Quote(JSONCONF))
+			fmt.Printf("use notepad++ or vim to edit %s\n", strconv.Quote(JSONCONF))
 		}
 	}
 }
