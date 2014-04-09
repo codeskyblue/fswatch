@@ -29,17 +29,16 @@ var (
 )
 
 type gowatch struct {
-	Paths         []string `json:"paths"`
-	Depth         int      `json:"depth"`
-	Exclude       []string `json:"exclude"`
-	reExclude     []*regexp.Regexp
-	Include       []string `json:"include"`
-	reInclude     []*regexp.Regexp
-	bufdur        time.Duration     `json:"-"`
-	Command       []string          `json:"command"`
-	Env           map[string]string `json:"env"`
-	EnableRestart bool              `json:"enable-restart"`
-	//BufferDuration string        `json:"buffer-duration"`
+	Paths     []string `json:"paths"`
+	Depth     int      `json:"depth"`
+	Exclude   []string `json:"exclude"`
+	reExclude []*regexp.Regexp
+	Include   []string `json:"include"`
+	reInclude []*regexp.Regexp
+	bufdur    time.Duration     `json:"-"`
+	Command   []string          `json:"command"`
+	Env       map[string]string `json:"env"`
+	//EnableRestart bool              `json:"enable-restart"`
 
 	w       *fsnotify.Watcher
 	modtime map[string]time.Time
@@ -64,7 +63,6 @@ func (this *gowatch) match(file string) bool {
 
 // Add dir and children (recursively) to watcher
 func (this *gowatch) watchDirAndChildren(path string) error {
-	//path := this.Path
 	if err := this.w.Watch(path); err != nil {
 		return err
 	}
@@ -179,22 +177,21 @@ func (this *gowatch) drainExec() {
 			if msg == "EXIT" {
 				os.Exit(1)
 			}
-			goto RESTART
+			goto SKIP_WAITING
 		case err = <-Go(c.Wait):
 			if err != nil {
 				log.Warn(err)
-				goto WAIT_SIGNAL
 			}
 		}
-		if this.EnableRestart && time.Since(startTime) > time.Second*2 {
-			continue
-		}
-	WAIT_SIGNAL:
+		//if this.EnableRestart && time.Since(startTime) > time.Second*2 {
+		//continue
+		//}
+		log.Info("finish in %s", time.Since(startTime))
 		log.Info("\033[33m-- wait signal --\033[0m")
 		if msg = <-this.sig; msg == "EXIT" {
 			os.Exit(1)
 		}
-	RESTART:
+	SKIP_WAITING:
 	}
 }
 
