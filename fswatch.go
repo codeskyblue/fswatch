@@ -222,7 +222,7 @@ func main() {
 		Paths:   []string{"."},
 		Depth:   2,
 		Command: []string{"echo", "hello fswatch!!!"},
-		Exclude: []string{"~$", "\\.swx$", "\\.exe$"},
+		Exclude: []string{"\\.sw[xp]$"},
 		Include: []string{"\\.*$"},
 	}
 	gw.Env = map[string]string{"POWERD_BY": "github.com/shxsun/fswatch"}

@@ -6,17 +6,17 @@ I reviewed the first version of fswatch(which was taged 0.1). The code I look no
 This version is works fine on mac and linux. Sorry for windows.
 
 ## How to use
-step 1. first you need to install it by the following command.
+**step 1.** first you need to install it by the following command.
 
 	go get github.com/shxsun/fswatch
 
-step 2. create a `.fswatch.json` file, which can be created by run 
+**step 2.** create a `.fswatch.json` file, which can be created by run 
 
 	fswatch
 
 modify `.fswatch.json`
 
-step 3. call `fswatch` again.
+**step 3.** call `fswatch` again.
 
 Chinese Blog: <http://my.oschina.net/goskyblue/blog/194240>
 
