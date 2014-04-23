@@ -2,12 +2,11 @@
     "paths": [
         "."
     ],
-    "depth": 2,
+    "depth": 0,
     "exclude": [],
     "include": ["\\.go$"],
     "command": [ "bash", "-c", "go build && ./golang" ],
     "env": {
         "POWERD_BY": "github.com/shxsun/fswatch"
-    },
-    "enable-restart": false
+    }
 }
