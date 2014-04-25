@@ -221,11 +221,11 @@ func main() {
 	gw := &gowatch{
 		Paths:   []string{"."},
 		Depth:   2,
-		Command: []string{"echo", "hello fswatch!!!"},
-		Exclude: []string{"\\.sw[xp]$"},
-		Include: []string{"\\.*$"},
+		Command: []string{"echo", "fswatch"},
+		Exclude: []string{},
+		Include: []string{"\\.(go|py|php|java|cpp|h|rb)$"},
 	}
-	gw.Env = map[string]string{"POWERD_BY": "github.com/shxsun/fswatch"}
+	gw.Env = map[string]string{"POWERD_BY": "github.com/codeskyblue/fswatch"}
 	if fd, err := os.Open(JSONCONF); err == nil {
 		if er := json.NewDecoder(fd).Decode(gw); er != nil {
 			log.Fatal(er)
