@@ -186,7 +186,7 @@ func (this *gowatch) drainExec() {
 		//if this.EnableRestart && time.Since(startTime) > time.Second*2 {
 		//continue
 		//}
-		log.Info("finish in %s", time.Since(startTime))
+		log.Infof("finish in %s", time.Since(startTime))
 		log.Info("\033[33m-- wait signal --\033[0m")
 		if msg = <-this.sig; msg == "EXIT" {
 			os.Exit(1)
