@@ -221,7 +221,7 @@ func main() {
 	gw := &gowatch{
 		Paths:   []string{"."},
 		Depth:   2,
-		Command: []string{"echo", "fswatch"},
+		Command: []string{"bash", "-c", "whoami"},
 		Exclude: []string{},
 		Include: []string{"\\.(go|py|php|java|cpp|h|rb)$"},
 	}
