@@ -226,6 +226,10 @@ func main() {
 		Include: []string{"\\.(go|py|php|java|cpp|h|rb)$"},
 	}
 	gw.Env = map[string]string{"POWERD_BY": "github.com/codeskyblue/fswatch"}
+	if flag.NArg() > 0 {
+		gw.Command = flag.Args()
+	}
+	// load JSONCONF
 	if fd, err := os.Open(JSONCONF); err == nil {
 		if er := json.NewDecoder(fd).Decode(gw); er != nil {
 			log.Fatal(er)
@@ -233,8 +237,7 @@ func main() {
 		for key, val := range gw.Env {
 			os.Setenv(key, val)
 		}
-		log.Fatal(gw.Watch())
-	} else {
+	} else if flag.NArg() == 0 {
 		fmt.Printf("initial %s file [y/n]: ", JSONCONF)
 		var yn string = "y"
 		fmt.Scan(&yn)
@@ -243,5 +246,7 @@ func main() {
 			ioutil.WriteFile(JSONCONF, data, 0644)
 			fmt.Printf("use notepad++ or vim to edit %s\n", strconv.Quote(JSONCONF))
 		}
+		return
 	}
+	log.Fatal(gw.Watch())
 }

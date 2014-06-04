@@ -18,6 +18,11 @@ modify `.fswatch.json`
 
 **step 3.** call `fswatch` again.
 
+## For easy coding
+just execute under go test dir, that was so simple
+
+	fswatch go test -v
+
 Chinese Blog: <http://my.oschina.net/goskyblue/blog/194240>
 
 ## Friendly link: 
