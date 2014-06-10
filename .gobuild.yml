@@ -1,0 +1,9 @@
+filesets:
+  includes:
+  - README.md
+  - LICENSE
+  excludes:
+  - .*.go
+settings:
+  addopts: "-x"
+  yaml"cgoenable": true
