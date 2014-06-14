@@ -226,9 +226,6 @@ func main() {
 		Include: []string{"\\.(go|py|php|java|cpp|h|rb)$"},
 	}
 	gw.Env = map[string]string{"POWERD_BY": "github.com/codeskyblue/fswatch"}
-	if flag.NArg() > 0 {
-		gw.Command = flag.Args()
-	}
 	// load JSONCONF
 	if fd, err := os.Open(JSONCONF); err == nil {
 		if er := json.NewDecoder(fd).Decode(gw); er != nil {
@@ -247,6 +244,9 @@ func main() {
 			fmt.Printf("use notepad++ or vim to edit %s\n", strconv.Quote(JSONCONF))
 		}
 		return
+	}
+	if flag.NArg() > 0 {
+		gw.Command = flag.Args()
 	}
 	log.Fatal(gw.Watch())
 }
