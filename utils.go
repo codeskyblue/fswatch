@@ -8,8 +8,8 @@ import (
 	"runtime"
 	"strconv"
 
+	sh "github.com/codeskyblue/go-sh"
 	"github.com/gobuild/log"
-	"github.com/shxsun/go-sh"
 )
 
 func groupKill(cmd *exec.Cmd) (err error) {
@@ -17,7 +17,11 @@ func groupKill(cmd *exec.Cmd) (err error) {
 	var pid, pgid int
 	if cmd.Process != nil {
 		pid = cmd.Process.Pid
-		c := sh.Command("/bin/ps", "-o", "pgid", "-p", strconv.Itoa(pid)).Command("sed", "-n", "2,$p")
+		sess := sh.NewSession()
+		if *verbose {
+			sess.ShowCMD = true
+		}
+		c := sess.Command("/bin/ps", "-o", "pgid", "-p", strconv.Itoa(pid)).Command("sed", "-n", "2,$p")
 		var out []byte
 		out, err = c.Output()
 		if err != nil {
@@ -27,7 +31,7 @@ func groupKill(cmd *exec.Cmd) (err error) {
 		if err != nil {
 			return
 		}
-		err = exec.Command("/bin/kill", "-TERM", "-"+strconv.Itoa(pgid)).Run()
+		err = sess.Command("pkill", "-TERM", "--pgroup", strconv.Itoa(pgid)).Run()
 	}
 	return
 }
