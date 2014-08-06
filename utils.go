@@ -12,7 +12,7 @@ import (
 	"github.com/gobuild/log"
 )
 
-func groupKill(cmd *exec.Cmd) (err error) {
+func groupKill(cmd *exec.Cmd, signal string) (err error) {
 	log.Println("\033[33mprogram terminated\033[0m")
 	var pid, pgid int
 	if cmd.Process != nil {
@@ -31,7 +31,7 @@ func groupKill(cmd *exec.Cmd) (err error) {
 		if err != nil {
 			return
 		}
-		err = sess.Command("pkill", "-TERM", "--pgroup", strconv.Itoa(pgid)).Run()
+		err = sess.Command("pkill", "-"+signal, "--pgroup", strconv.Itoa(pgid)).Run()
 	}
 	return
 }

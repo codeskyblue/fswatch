@@ -19,14 +19,12 @@ import (
 	"github.com/howeyc/fsnotify"
 )
 
+var verbose = flag.Bool("v", false, "show verbose")
+
 func init() {
 	log.SetFlags(0)
 	log.SetPrefix("\033[32mfswatch\033[0m >>> ")
 }
-
-var (
-	verbose = flag.Bool("v", false, "show verbose")
-)
 
 type gowatch struct {
 	Paths     []string `json:"paths"`
@@ -38,7 +36,10 @@ type gowatch struct {
 	bufdur    time.Duration     `json:"-"`
 	Command   []string          `json:"command"`
 	Env       map[string]string `json:"env"`
-	//EnableRestart bool              `json:"enable-restart"`
+
+	AutoRestart     bool          `json:"autorestart"`
+	RestartInterval time.Duration `json:"restart-interval"`
+	KillSignal      string        `json:"kill-signal"`
 
 	w       *fsnotify.Watcher
 	modtime map[string]time.Time
@@ -167,12 +168,12 @@ func (this *gowatch) drainExec() {
 
 		err := c.Start()
 		if err != nil {
-			log.Warn(err)
+			log.Warn("\033[35m" + err.Error() + "\033[0m")
 		}
 		select {
 		case msg = <-this.sig:
-			if err := groupKill(c); err != nil {
-				log.Error(err)
+			if err := groupKill(c, this.KillSignal); err != nil {
+				log.Errorf("group kill: %v", err)
 			}
 			if msg == "EXIT" {
 				os.Exit(1)
@@ -180,18 +181,21 @@ func (this *gowatch) drainExec() {
 			goto SKIP_WAITING
 		case err = <-Go(c.Wait):
 			if err != nil {
-				log.Warn(err)
+				log.Warnf("program exited: %v", err)
 			}
+			//	groupKill(c, this.KillSignal)
 		}
-		//if this.EnableRestart && time.Since(startTime) > time.Second*2 {
-		//continue
-		//}
 		log.Infof("finish in %s", time.Since(startTime))
+		if this.AutoRestart {
+			goto SKIP_WAITING
+		}
 		log.Info("\033[33m-- wait signal --\033[0m")
 		if msg = <-this.sig; msg == "EXIT" {
 			os.Exit(1)
 		}
 	SKIP_WAITING:
+		log.Infof("auto restart after %s", this.RestartInterval)
+		time.Sleep(this.RestartInterval)
 	}
 }
 
@@ -217,13 +221,15 @@ func delayEvent(event chan *fsnotify.FileEvent, notifyDelay time.Duration) {
 const JSONCONF = ".fswatch.json"
 
 func main() {
-	flag.Parse()
 	gw := &gowatch{
-		Paths:   []string{"."},
-		Depth:   2,
-		Command: []string{"bash", "-c", "whoami"},
-		Exclude: []string{},
-		Include: []string{"\\.(go|py|php|java|cpp|h|rb)$"},
+		Paths:           []string{"."},
+		Depth:           2,
+		Command:         []string{"bash", "-c", "whoami"},
+		Exclude:         []string{},
+		Include:         []string{"\\.(go|py|php|java|cpp|h|rb)$"},
+		AutoRestart:     false,
+		RestartInterval: time.Second * 5,
+		KillSignal:      "KILL",
 	}
 	gw.Env = map[string]string{"POWERD_BY": "github.com/codeskyblue/fswatch"}
 	// load JSONCONF
@@ -245,6 +251,12 @@ func main() {
 		}
 		return
 	}
+
+	flag.DurationVar(&gw.RestartInterval, "ri", gw.RestartInterval, "restart interval")
+	flag.BoolVar(&gw.AutoRestart, "r", gw.AutoRestart, "enable autorestart")
+	flag.StringVar(&gw.KillSignal, "k", gw.KillSignal, "kill signal")
+	flag.Parse()
+
 	if flag.NArg() > 0 {
 		gw.Command = flag.Args()
 	}
