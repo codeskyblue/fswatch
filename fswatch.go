@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"regexp"
@@ -159,20 +158,15 @@ func (this *gowatch) drainExec() {
 			cmd = []string{"echo", "no command specified"}
 		}
 		log.Info("\033[35mexec start\033[0m")
-		c := exec.Command(cmd[0], cmd[1:]...)
-		c.Stdout = os.Stdout
-		c.Stderr = os.Stdout
-
-		c.SysProcAttr = &syscall.SysProcAttr{}
-		c.SysProcAttr.Setpgid = true
-
+		c := StartCmd(cmd[0], cmd[1:]...)
 		err := c.Start()
 		if err != nil {
 			log.Warn("\033[35m" + err.Error() + "\033[0m")
 		}
 		select {
 		case msg = <-this.sig:
-			if err := groupKill(c, this.KillSignal); err != nil {
+			log.Printf("\033[33mprogram terminated, sig:%s\033[0m\n", this.KillSignal)
+			if err := KillCmd(c, this.KillSignal); err != nil {
 				log.Errorf("group kill: %v", err)
 			}
 			if msg == "EXIT" {
@@ -194,7 +188,9 @@ func (this *gowatch) drainExec() {
 			os.Exit(1)
 		}
 	SKIP_WAITING:
-		log.Infof("auto restart after %s", this.RestartInterval)
+		if this.RestartInterval > 0 {
+			log.Infof("restart after %s", this.RestartInterval)
+		}
 		time.Sleep(this.RestartInterval)
 	}
 }
@@ -228,7 +224,7 @@ func main() {
 		Exclude:         []string{},
 		Include:         []string{"\\.(go|py|php|java|cpp|h|rb)$"},
 		AutoRestart:     false,
-		RestartInterval: time.Second * 5,
+		RestartInterval: 0,
 		KillSignal:      "KILL",
 	}
 	gw.Env = map[string]string{"POWERD_BY": "github.com/codeskyblue/fswatch"}
