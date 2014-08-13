@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -22,7 +23,18 @@ var verbose = flag.Bool("v", false, "show verbose")
 
 func init() {
 	log.SetFlags(0)
-	log.SetPrefix("\033[32mfswatch\033[0m >>> ")
+	if runtime.GOOS == "windows" {
+		log.SetPrefix("fswatch >>> ")
+	} else {
+		log.SetPrefix("\033[32mfswatch\033[0m >>> ")
+	}
+}
+
+func colorPrintf(ansiColor string, format string, args ...interface{}) {
+	if runtime.GOOS != "windows" {
+		format = "\033[" + ansiColor + "m" + format + "\033[0m"
+	}
+	log.Printf(format, args...)
 }
 
 type gowatch struct {
@@ -157,15 +169,15 @@ func (this *gowatch) drainExec() {
 		if len(cmd) == 0 {
 			cmd = []string{"echo", "no command specified"}
 		}
-		log.Info("\033[35mexec start\033[0m")
+		colorPrintf("35", "exec start")
 		c := StartCmd(cmd[0], cmd[1:]...)
 		err := c.Start()
 		if err != nil {
-			log.Warn("\033[35m" + err.Error() + "\033[0m")
+			colorPrintf("35", err.Error())
 		}
 		select {
 		case msg = <-this.sig:
-			log.Printf("\033[33mprogram terminated, sig:%s\033[0m\n", this.KillSignal)
+			colorPrintf("33", "program terminated, signal(%s)", this.KillSignal)
 			if err := KillCmd(c, this.KillSignal); err != nil {
 				log.Errorf("group kill: %v", err)
 			}
@@ -177,13 +189,12 @@ func (this *gowatch) drainExec() {
 			if err != nil {
 				log.Warnf("program exited: %v", err)
 			}
-			//	groupKill(c, this.KillSignal)
 		}
 		log.Infof("finish in %s", time.Since(startTime))
 		if this.AutoRestart {
 			goto SKIP_WAITING
 		}
-		log.Info("\033[33m-- wait signal --\033[0m")
+		colorPrintf("33", "-- wait signal --")
 		if msg = <-this.sig; msg == "EXIT" {
 			os.Exit(1)
 		}

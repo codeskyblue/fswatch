@@ -3,7 +3,7 @@
 
 I reviewed the first version of fswatch(which was taged 0.1). The code I look now is shit. So I deleted almost 80% code, And left some very useful functions.
 
-This version is works fine on mac and linux. Sorry for windows.
+This version is works fine on mac and linux. (**Support windows now**)
 
 ## How to use
 **step 1.** first you need to install it by the following command.
