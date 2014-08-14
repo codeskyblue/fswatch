@@ -247,7 +247,15 @@ func main() {
 		for key, val := range gw.Env {
 			os.Setenv(key, val)
 		}
-	} else if flag.NArg() == 0 {
+	}
+	flag.DurationVar(&gw.RestartInterval, "ri", gw.RestartInterval, "restart interval")
+	flag.BoolVar(&gw.AutoRestart, "r", gw.AutoRestart, "enable autorestart")
+	flag.StringVar(&gw.KillSignal, "k", gw.KillSignal, "kill signal")
+	flag.Parse()
+	if flag.NArg() > 0 {
+		gw.Command = flag.Args()
+	}
+	if len(gw.Command) == 0 {
 		fmt.Printf("initial %s file [y/n]: ", JSONCONF)
 		var yn string = "y"
 		fmt.Scan(&yn)
@@ -257,15 +265,6 @@ func main() {
 			fmt.Printf("use notepad++ or vim to edit %s\n", strconv.Quote(JSONCONF))
 		}
 		return
-	}
-
-	flag.DurationVar(&gw.RestartInterval, "ri", gw.RestartInterval, "restart interval")
-	flag.BoolVar(&gw.AutoRestart, "r", gw.AutoRestart, "enable autorestart")
-	flag.StringVar(&gw.KillSignal, "k", gw.KillSignal, "kill signal")
-	flag.Parse()
-
-	if flag.NArg() > 0 {
-		gw.Command = flag.Args()
 	}
 	log.Fatal(gw.Watch())
 }
