@@ -38,7 +38,7 @@ func KillCmd(cmd *exec.Cmd, signal string) (err error) {
 		if err != nil {
 			return
 		}
-		err = sess.Command("pkill", "-"+signal, "--pgroup", strconv.Itoa(pgid)).Run()
+		return sess.Command("/bin/ps", "-eo", "pid,pgid").Command("awk", fmt.Sprintf(`$2==%d {system("/bin/kill -%s "$1)}`, pgid, signal)).Run()
 	}
 	return
 }

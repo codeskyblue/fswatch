@@ -231,7 +231,6 @@ func main() {
 	gw := &gowatch{
 		Paths:           []string{"."},
 		Depth:           2,
-		Command:         []string{"bash", "-c", "whoami"},
 		Exclude:         []string{},
 		Include:         []string{"\\.(go|py|php|java|cpp|h|rb)$"},
 		AutoRestart:     false,
@@ -259,6 +258,7 @@ func main() {
 		fmt.Printf("initial %s file [y/n]: ", JSONCONF)
 		var yn string = "y"
 		fmt.Scan(&yn)
+		gw.Command = []string{"bash", "-c", "whoami"}
 		if strings.ToUpper(strings.TrimSpace(yn)) == "Y" {
 			data, _ := json.MarshalIndent(gw, "", "    ")
 			ioutil.WriteFile(JSONCONF, data, 0644)
