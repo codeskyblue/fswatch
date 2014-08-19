@@ -5,21 +5,32 @@ I reviewed the first version of fswatch(which was taged 0.1). The code I look no
 
 This version is works fine on mac and linux. (**Support windows now**)
 
+## Install
+
+	go get github.com/codeskyblue/fswatch
+
 ## How to use
-**step 1.** first you need to install it by the following command.
+fswatch (default)monitor files which match regex: `\\.(go|py|php|java|cpp|h|rb)$`. This is regex can be modified through `.fswatch.json` file, we talk about that later.
 
-	go get github.com/shxsun/fswatch
+This easiest way to use fswatch is run command:
 
-**step 2.** create a `.fswatch.json` file, which can be created by run 
+	fswatch ls
+	# open a new terminal (make sure the workdir some as the previos terminal)
+	touch hello.go
+	# some thing should happens
 
-	fswatch
+Now it's time to talk about the `.fswatch.json` file. The file can be created by 
 
-modify `.fswatch.json`
+	fswatch 
+	# then press y when prompt occurs
 
-**step 3.** call `fswatch` again.
+modify `.fswatch.json`. and run `fswatch` again. Enjoy your time.
 
-## For easy coding
-just execute under go test dir, that was so simple
+## Other
+* fswatch kill all process when restart. (mac and linux killed by pgid, windows by taskkill)
+* `Ctrl+C` will trigger fswatch quit and kill all process it started.
+
+auto test golang code
 
 	fswatch go test -v
 
