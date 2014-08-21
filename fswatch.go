@@ -241,12 +241,13 @@ func main() {
 	// load JSONCONF
 	if fd, err := os.Open(JSONCONF); err == nil {
 		if er := json.NewDecoder(fd).Decode(gw); er != nil {
-			log.Fatal(er)
+			log.Fatalf("json decode error: %v", er)
 		}
 		for key, val := range gw.Env {
 			os.Setenv(key, val)
 		}
 	}
+
 	flag.DurationVar(&gw.RestartInterval, "ri", gw.RestartInterval, "restart interval")
 	flag.BoolVar(&gw.AutoRestart, "r", gw.AutoRestart, "enable autorestart")
 	flag.StringVar(&gw.KillSignal, "k", gw.KillSignal, "kill signal")
