@@ -4,7 +4,3 @@ filesets:
   - LICENSE
   excludes:
   - .*.go
-settings:
-  targetdir: ""
-  addopts: ""
-  yaml"cgoenable": true
