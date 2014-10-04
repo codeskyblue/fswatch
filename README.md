@@ -6,6 +6,7 @@ I reviewed the first version of fswatch(which was taged 0.1). The code I look no
 This version is works fine on mac and linux. (**Support windows now**)
 
 ## Install
+[![Gobuild Download](https://img.shields.io/badge/gobuild-download-green.svg?style=flat)](http://gobuild.io/github.com/codeskyblue/fswatch)
 
 	go get github.com/codeskyblue/fswatch
 
