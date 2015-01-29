@@ -74,7 +74,7 @@ func (this *gowatch) match(file string) bool {
 }
 
 // Add dir and children (recursively) to watcher
-func (this *gowatch) watchDirAndChildren(path string) error {
+func (this *gowatch) watchDirAndChildren(path string, depth int) error {
 	if err := this.w.Watch(path); err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func (this *gowatch) watchDirAndChildren(path string) error {
 			}
 
 			pathDepth := strings.Count(path, string(os.PathSeparator)) - baseNumSeps
-			if pathDepth > this.Depth {
+			if pathDepth > depth {
 				return filepath.SkipDir
 			}
 			if *verbose {
@@ -106,7 +106,7 @@ func (this *gowatch) Watch() (err error) {
 		return
 	}
 	for _, path := range this.Paths {
-		if err = this.watchDirAndChildren(os.ExpandEnv(path)); err != nil {
+		if err = this.watchDirAndChildren(os.ExpandEnv(path), this.Depth); err != nil {
 			log.Fatal(err)
 		}
 	}
