@@ -7,9 +7,11 @@ import (
 	"reflect"
 	"runtime"
 	"strconv"
+	"time"
 
 	sh "github.com/codeskyblue/go-sh"
 	"github.com/gobuild/log"
+	"github.com/howeyc/fsnotify"
 )
 
 func groupKill(cmd *exec.Cmd, signal string) (err error) {
@@ -38,4 +40,24 @@ func groupKill(cmd *exec.Cmd, signal string) (err error) {
 
 func GetFunctionName(i interface{}) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
+}
+
+func Go(f func() error) chan error {
+	ch := make(chan error)
+	go func() {
+		ch <- f()
+	}()
+	return ch
+}
+
+// block event after specified duration
+func delayEvent(event chan *fsnotify.FileEvent, notifyDelay time.Duration) {
+	for {
+		select {
+		case <-event: //filterEvent:
+			continue
+		case <-time.After(notifyDelay):
+			return
+		}
+	}
 }

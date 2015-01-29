@@ -1,4 +1,4 @@
-fswatch
+fswatch -- Not yet ready
 =============
 Watch file system events and then trigger some commands.
 
