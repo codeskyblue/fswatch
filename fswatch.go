@@ -325,9 +325,22 @@ Example:
 		}
 	}
 
+	// []string is unmarshaled as []interface{}
+	if v, ok := gw.Command.([]interface{}); ok {
+		cmd := make([]string, 0, len(v))
+		for _, i := range v {
+			if s, ok := i.(string); ok {
+				cmd = append(cmd, s)
+			} else {
+				log.Fatalf("check you config file. \"command\" must be string or []string, got %T", gw.Command)
+			}
+		}
+		gw.Command = cmd
+	}
+
 	switch gw.Command.(type) {
 	default:
-		log.Fatal("check you config file. \"command\" must be string or []string")
+		log.Fatalf("check you config file. \"command\" must be string or []string, got %T", gw.Command)
 	case string:
 		if runtime.GOOS == "windows" {
 			gw.cmd = []string{"cmd", "/c", gw.Command.(string)}
