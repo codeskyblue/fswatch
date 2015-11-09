@@ -99,7 +99,6 @@ type gowatch struct {
 
 // Check if file matches
 func (this *gowatch) match(file string) bool {
-	file = filepath.Base(file)
 	for _, rule := range this.reExclude {
 		if rule.MatchString(file) {
 			return false
