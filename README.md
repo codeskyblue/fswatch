@@ -27,6 +27,17 @@ Now it's time to talk about the `.fswatch.json` file. The file can be created by
 
 modify `.fswatch.json`. and run `fswatch` again. Enjoy your time.
 
+## Troubles
+`too many open files`
+
+For mac, run the following command
+
+    sysctl -w kern.maxfiles=20480
+    sysctl -w kern.maxfilesperproc=18000
+    ulimit -S -n 2048
+
+[reference](http://superuser.com/questions/433746/is-there-a-fix-for-the-too-many-open-files-in-system-error-on-os-x-10-7-1)
+
 ## Other
 * fswatch kill all process when restart. (mac and linux killed by pgid, windows by taskkill)
 * `Ctrl+C` will trigger fswatch quit and kill all process it started.
