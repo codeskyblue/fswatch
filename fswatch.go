@@ -30,19 +30,6 @@ func init() {
 	}
 }
 
-const (
-	CYELLOW = "33"
-	CGREEN  = "32"
-	CPURPLE = "35"
-)
-
-func cprintf(ansiColor string, format string, args ...interface{}) {
-	if runtime.GOOS != "windows" {
-		format = "\033[" + ansiColor + "m" + format + "\033[0m"
-	}
-	log.Printf(format, args...)
-}
-
 /*
 type pathWatch struct {
 	Include   string `json:"include"`
@@ -214,17 +201,17 @@ func (this *gowatch) drainExec() {
 		if len(cmd) == 0 {
 			cmd = []string{"echo", "no command specified"}
 		}
-		cprintf(CGREEN, "exec start")
+		CPrintf(CGREEN, "exec start")
 		c := StartCmd(cmd[0], cmd[1:]...)
 		// Start to run command
 		err := c.Start()
 		if err != nil {
-			cprintf("35", err.Error())
+			CPrintf("35", err.Error())
 		}
 		// Wait until killed or finished
 		select {
 		case msg = <-this.sig:
-			cprintf(CYELLOW, "program terminated, signal(%s)", this.KillSignal)
+			CPrintf(CYELLOW, "program terminated, signal(%s)", this.KillSignal)
 			if err := KillCmd(c, this.KillSignal); err != nil {
 				log.Errorf("group kill: %v", err)
 			}
@@ -234,7 +221,7 @@ func (this *gowatch) drainExec() {
 			goto SKIP_WAITING
 		case err = <-Go(c.Wait):
 			if err != nil {
-				cprintf(CPURPLE, "program exited: %v", err)
+				CPrintf(CPURPLE, "program exited: %v", err)
 			}
 		}
 		log.Infof("finish in %s", time.Since(startTime))
@@ -243,7 +230,7 @@ func (this *gowatch) drainExec() {
 		if this.AutoRestart {
 			goto SKIP_WAITING
 		}
-		cprintf("33", "-- wait signal --")
+		CPrintf("33", "-- wait signal --")
 		if msg = <-this.sig; msg == "EXIT" {
 			os.Exit(1)
 		}
@@ -303,6 +290,7 @@ Example:
 `)
 	}
 	flagParse()
+
 	if len(os.Args) == 1 && !confExists {
 		fmt.Printf("Create %s file [y/n]: ", strconv.Quote(JSONCONF))
 		var yn string = "y"

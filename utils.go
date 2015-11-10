@@ -14,6 +14,19 @@ import (
 	"github.com/howeyc/fsnotify"
 )
 
+const (
+	CYELLOW = "33"
+	CGREEN  = "32"
+	CPURPLE = "35"
+)
+
+func CPrintf(ansiColor string, format string, args ...interface{}) {
+	if runtime.GOOS != "windows" {
+		format = "\033[" + ansiColor + "m" + format + "\033[0m"
+	}
+	log.Printf(format, args...)
+}
+
 func groupKill(cmd *exec.Cmd, signal string) (err error) {
 	log.Println("\033[33mprogram terminated\033[0m")
 	var pid, pgid int
