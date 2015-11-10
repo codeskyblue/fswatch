@@ -1,4 +1,6 @@
 # fswatch
+[![Build Status](https://travis-ci.org/codeskyblue/fswatch.svg?branch=master)](https://travis-ci.org/codeskyblue/fswatch)
+
 **fswatch** is a command tool. Use file system event to trigger user defined commands. 
 
 I reviewed the first version of fswatch(which was taged 0.1). The code I look now is shit. So I deleted almost 80% code, And left some very useful functions.
@@ -6,7 +8,6 @@ I reviewed the first version of fswatch(which was taged 0.1). The code I look no
 This version is works fine on mac and linux. (**Support windows now**)
 
 ## Install
-[![Gobuild Download](https://img.shields.io/badge/gobuild-download-green.svg?style=flat)](http://gobuild.io/github.com/codeskyblue/fswatch)
 
 	go get github.com/codeskyblue/fswatch
 
