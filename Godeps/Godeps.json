@@ -1,16 +1,14 @@
 {
-	"ImportPath": "fswatch",
-	"GoVersion": "go1.5",
+	"ImportPath": "github.com/codeskyblue/fswatch",
+	"GoVersion": "go1.4.2",
 	"Deps": [
 		{
-			"ImportPath": "github.com/codegangsta/inject",
-			"Comment": "v1.0-rc1-10-g33e0aa1",
-			"Rev": "33e0aa1cb7c019ccc3fbe049a8262a6403d30504"
+			"ImportPath": "github.com/codeskyblue/dockerignore",
+			"Rev": "de82dee623d9207f906d327172149cba50427a88"
 		},
 		{
-			"ImportPath": "github.com/codeskyblue/go-sh",
-			"Comment": "v0.1-32-gdbcc84e",
-			"Rev": "dbcc84e889ce788aa64971d6eb98ab1d24d84cdf"
+			"ImportPath": "github.com/codeskyblue/kexec",
+			"Rev": "b7e1983cb3267c8862794eacf39b14386dfa441f"
 		},
 		{
 			"ImportPath": "github.com/gobuild/log",
@@ -20,6 +18,10 @@
 			"ImportPath": "github.com/howeyc/fsnotify",
 			"Comment": "v0.9.0-14-g4894fe7",
 			"Rev": "4894fe7efedeeef21891033e1cce3b23b9af7ad2"
+		},
+		{
+			"ImportPath": "gopkg.in/yaml.v2",
+			"Rev": "53feefa2559fb8dfa8d81baad31be332c97d6c77"
 		}
 	]
 }
