@@ -19,8 +19,8 @@ import (
 
 	ignore "github.com/codeskyblue/dockerignore"
 	"github.com/codeskyblue/kexec"
+	"github.com/go-fsnotify/fsnotify"
 	"github.com/gobuild/log"
-	"github.com/howeyc/fsnotify"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -56,9 +56,13 @@ func init() {
 }
 
 const (
-	CYELLOW = "33"
-	CGREEN  = "32"
-	CPURPLE = "35"
+	CBLACK   = "30"
+	CRED     = "31"
+	CGREEN   = "32"
+	CYELLOW  = "33"
+	CBLUE    = "34"
+	CMAGENTA = "35"
+	CPURPLE  = "36"
 )
 
 func CPrintf(ansiColor string, format string, args ...interface{}) {
@@ -69,6 +73,7 @@ func CPrintf(ansiColor string, format string, args ...interface{}) {
 }
 
 type TriggerEvent struct {
+	Name          string            `yaml:"name" json:"name"`
 	Pattens       []string          `yaml:"pattens" json:"pattens"`
 	matchPattens  []string          `yaml:"-" json:"-"`
 	Environ       map[string]string `yaml:"env" json:"env"`
@@ -81,7 +86,7 @@ type TriggerEvent struct {
 }
 
 func (this *TriggerEvent) Start() error {
-	CPrintf(CGREEN, fmt.Sprintf("exec start: %s", this.Command))
+	CPrintf(CGREEN, fmt.Sprintf("[%s] exec start: %s", this.Name, this.Command))
 	startTime := time.Now()
 	cmd := kexec.CommandString(this.Command)
 	env := os.Environ()
@@ -93,9 +98,9 @@ func (this *TriggerEvent) Start() error {
 	err := cmd.Start()
 	go func() {
 		if er := cmd.Wait(); er != nil {
-			CPrintf(CPURPLE, "program exited: %v", er)
+			CPrintf(CRED, "[%s] program exited: %v", this.Name, er)
 		}
-		log.Infof("finish in %s", time.Since(startTime))
+		log.Infof("[%s] finish in %s", this.Name, time.Since(startTime))
 	}()
 	return err
 }
@@ -107,7 +112,7 @@ func (this *TriggerEvent) Stop() {
 			return
 		}
 		this.kcmd.Terminate(this.killSignal)
-		CPrintf(CYELLOW, "program terminated, signal(%v)", this.killSignal)
+		CPrintf(CYELLOW, "[%s] program terminated, signal(%v)", this.Name, this.killSignal)
 		this.kcmd = nil
 	}
 }
@@ -124,7 +129,8 @@ func (this *TriggerEvent) WatchEvent(evtC chan FSEvent, wg *sync.WaitGroup) {
 			continue
 		}
 		this.Stop()
-		log.Printf("delay: %v", this.Delay)
+		CPrintf(CGREEN, "changed: %v", evt.Name)
+		CPrintf(CGREEN, "delay: %v", this.Delay)
 		time.Sleep(this.delayDuration)
 		this.Start()
 	}
@@ -272,7 +278,7 @@ func WatchPathAndChildren(w *fsnotify.Watcher, paths []string, depth int, visits
 		if visits[dir] {
 			return
 		}
-		w.Watch(dir)
+		w.Add(dir)
 		log.Debug("Watch directory:", dir)
 		visits[dir] = true
 	}
@@ -356,20 +362,22 @@ func readFWConfig(paths ...string) (fwc FWConfig, err error) {
 }
 
 func transformEvent(fsw *fsnotify.Watcher, evtC chan FSEvent) {
-	for evt := range fsw.Event {
-		if evt.IsCreate() && IsDirectory(evt.Name) {
-			log.Info("Add watcher")
-			fsw.Watch(evt.Name)
+	for evt := range fsw.Events {
+		if evt.Op == fsnotify.Create && IsDirectory(evt.Name) {
+			log.Info("Add watcher", evt.Name)
+			fsw.Add(evt.Name)
 			continue
 		}
-		if evt.IsDelete() {
-			log.Info("Remove watcher")
-			fsw.RemoveWatch(evt.Name)
+		if evt.Op == fsnotify.Remove {
+			if err := fsw.Remove(evt.Name); err == nil {
+				log.Info("Remove watcher", evt.Name)
+			}
+			continue
 		}
 		if !IsChanged(evt.Name) {
 			continue
 		}
-		log.Printf("Changed: %s", evt.Name)
+		//log.Printf("Changed: %s", evt.Name)
 		evtC <- FSEvent{ // may panic here
 			Name: evt.Name,
 		}

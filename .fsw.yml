@@ -4,10 +4,12 @@ triggers:
   - '*.go'
   - '!testdata/*'
   cmd: go test -v
+  name: test
 
 - pattens:
   - 'testdata/*'
   cmd: echo Haha, detect testdata changed && sleep 2
+  name: echo
 watch_paths:
 - .
 watch_depth: 5

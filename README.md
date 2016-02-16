@@ -29,7 +29,7 @@ triggers:
     DEBUG: "1"
   cmd: go test -v
   delay: 100ms
-  signal: ""
+  signal: "HUP"
 watch_paths:
 - .
 watch_depth: 5
@@ -83,6 +83,8 @@ Chinese Blog: <http://my.oschina.net/goskyblue/blog/194240>
 ## Friendly link: 
 * [bee](https://github.com/astaxie/bee)
 * [fsnotify](https://github.com/howeyc/fsnotify)
+* <https://github.com/codeskyblue/kexec>
+* <https://github.com/codeskyblue/dockerignore>
 
 ## Code History
 I reviewed the first version of fswatch(which was taged 0.1). The code I look now is shit. So I deleted almost 80% code, And left some very useful functions.
