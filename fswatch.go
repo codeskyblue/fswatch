@@ -433,10 +433,11 @@ func main() {
 
 		sigOS := make(chan os.Signal, 1)
 		signal.Notify(sigOS, syscall.SIGINT)
+		signal.Notify(sigOS, syscall.SIGTERM)
 
 		go func() {
-			<-sigOS
-			CPrintf(CPURPLE, "Catch signal Interrupt!")
+			sig := <-sigOS
+			CPrintf(CPURPLE, "Catch signal %v!", sig)
 			close(evtC)
 		}()
 		go transformEvent(fsw, evtC)
