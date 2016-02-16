@@ -1,27 +1,46 @@
 package main
 
 import (
-	"encoding/json"
+	"bytes"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"regexp"
 	"runtime"
-	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
+	ignore "github.com/codeskyblue/dockerignore"
+	"github.com/codeskyblue/kexec"
 	"github.com/gobuild/log"
 	"github.com/howeyc/fsnotify"
+	yaml "gopkg.in/yaml.v2"
 )
 
-var verbose = flag.Bool("v", false, "show verbose")
+const FWCONFIG = ".fwc.yml"
+
+var (
+	VERSION = "2.0"
+)
+
+var signalMaps = map[string]os.Signal{
+	"INT":  syscall.SIGINT,
+	"HUP":  syscall.SIGHUP,
+	"QUIT": syscall.SIGQUIT,
+	"TRAP": syscall.SIGTRAP,
+	"TERM": syscall.SIGTERM,
+	"KILL": syscall.SIGKILL, // kill -9
+}
 
 func init() {
+	for key, val := range signalMaps {
+		signalMaps["SIG"+key] = val
+		signalMaps[fmt.Sprintf("%d", val)] = val
+	}
 	log.SetFlags(0)
 	if runtime.GOOS == "windows" {
 		log.SetPrefix("fswatch >>> ")
@@ -30,83 +49,165 @@ func init() {
 	}
 }
 
-/*
-type pathWatch struct {
-	Include   string `json:"include"`
-	reInclude *regexp.Regexp
-	Exclude   string `json:"exclude"`
-	reExclude *regexp.Regexp
-	Depth     int `json:"depth"`
-}
+const (
+	CYELLOW = "33"
+	CGREEN  = "32"
+	CPURPLE = "35"
+)
 
-type fsWatch struct {
-	PathWatches []pathWatch
-	Command     []string `json:"command"`
-	Cmd         string   `json:"cmd"` // if empty will add prefix(bash -c) and replace Command
-	Signal      string   `json:"signal"`
-	KillAsGroup bool     `json:"killasgroup"`
-}
-
-func init() {
-	fw := fsWatch{
-		PathWatches: []pathWatch{
-			pathWatch{Include: "./", Exclude: "\\.svn"},
-		},
-		Cmd: "ls -l",
+func CPrintf(ansiColor string, format string, args ...interface{}) {
+	if runtime.GOOS != "windows" {
+		format = "\033[" + ansiColor + "m" + format + "\033[0m"
 	}
-	data, err := yaml.Marshal(fw)
-	if err != nil {
-		log.Fatal(err)
+	log.Printf(format, args...)
+}
+
+type TriggerEvent struct {
+	Pattens       []string          `yaml:"pattens"`
+	matchPattens  []string          `yaml:"-"`
+	Environ       map[string]string `yaml:"env"`
+	Command       string            `yaml:"cmd"`
+	Delay         string            `yaml:"delay"`
+	delayDuration time.Duration     `yaml:"-"`
+	Signal        string            `yaml:"signal"`
+	killSignal    os.Signal         `yaml:"-"`
+	kcmd          *kexec.KCommand
+}
+
+func (this *TriggerEvent) Start() error {
+	CPrintf(CGREEN, fmt.Sprintf("exec start: %s", this.Command))
+	startTime := time.Now()
+	cmd := kexec.CommandString(this.Command)
+	env := os.Environ()
+	for key, val := range this.Environ {
+		env = append(env, fmt.Sprintf("%s=%s", key, val))
 	}
-	fmt.Println(string(data))
-}
-*/
-
-type gowatch struct {
-	Paths     []string `json:"paths"`
-	Depth     int      `json:"depth"`
-	Exclude   []string `json:"exclude"`
-	reExclude []*regexp.Regexp
-	Include   []string `json:"include"`
-	reInclude []*regexp.Regexp
-	bufdur    time.Duration `json:"-"`
-	Command   interface{}   `json:"command"` // can be string or []string
-	cmd       []string
-	Env       map[string]string `json:"env"`
-
-	AutoRestart     bool          `json:"autorestart"`
-	RestartInterval time.Duration `json:"restart-interval"`
-	KillSignal      string        `json:"kill-signal"`
-
-	w       *fsnotify.Watcher
-	modtime map[string]time.Time
-	sig     chan string
-	sigOS   chan os.Signal
-}
-
-// Check if file matches
-func (this *gowatch) match(file string) bool {
-	file = filepath.Base(file)
-	for _, rule := range this.reExclude {
-		if rule.MatchString(file) {
-			return false
+	cmd.Env = env
+	this.kcmd = cmd
+	err := cmd.Start()
+	go func() {
+		if er := cmd.Wait(); er != nil {
+			CPrintf(CPURPLE, "program exited: %v", er)
 		}
-	}
-	for _, rule := range this.reInclude {
-		if rule.MatchString(file) {
-			return true
-		}
-	}
-	return len(this.reInclude) == 0 // if empty include, then return true
+		log.Infof("finish in %s", time.Since(startTime))
+	}()
+	return err
 }
 
-// Add dir and children (recursively) to watcher
-func (this *gowatch) watchDirAndChildren(path string, depth int) error {
-	if err := this.w.Watch(path); err != nil {
-		return err
+func (this *TriggerEvent) Stop() {
+	if this.kcmd != nil {
+		if this.kcmd.ProcessState != nil && this.kcmd.ProcessState.Exited() {
+			this.kcmd = nil
+			return
+		}
+		this.kcmd.Terminate(this.killSignal)
+		CPrintf(CYELLOW, "program terminated, signal(%v)", this.killSignal)
+		this.kcmd = nil
 	}
+}
+
+func (this *TriggerEvent) WatchEvent(evtC chan FSEvent, wg *sync.WaitGroup) {
+	this.Start()
+	for evt := range evtC {
+		// log.Println(evt)
+		isMatch, err := ignore.Matches(evt.Name, this.Pattens)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if !isMatch {
+			continue
+		}
+		this.Stop()
+		log.Printf("delay: %v", this.Delay)
+		time.Sleep(this.delayDuration)
+		this.Start()
+	}
+	this.Stop()
+	wg.Done()
+}
+
+type FSEvent struct {
+	Name string
+}
+
+type FWConfig struct {
+	Description string         `yaml:"desc"`
+	Triggers    []TriggerEvent `yaml:"triggers"`
+	WatchPaths  []string       `yaml:"watch_paths"`
+	WatchDepth  int            `yaml:"watch_depth"`
+}
+
+func fixFWConfig(in FWConfig) (out FWConfig, err error) {
+	out = in
+	for idx, trigger := range in.Triggers {
+		outTg := &out.Triggers[idx]
+		if trigger.Delay == "" {
+			outTg.Delay = "100ms"
+		}
+		outTg.delayDuration, err = time.ParseDuration(outTg.Delay)
+		if err != nil {
+			return
+		}
+		if outTg.Signal == "" {
+			outTg.Signal = "HUP"
+		}
+		outTg.killSignal = signalMaps[outTg.Signal]
+
+		rd := ioutil.NopCloser(bytes.NewBufferString(strings.Join(outTg.Pattens, "\n")))
+		// rd := ioutil.NopCloser(bytes.NewBufferString("*.exe"))
+		patterns, er := ignore.ReadIgnore(rd)
+		if er != nil {
+			err = er
+			return
+		}
+		outTg.matchPattens = patterns
+	}
+	if len(out.WatchPaths) == 0 {
+		out.WatchPaths = append(out.WatchPaths, ".")
+	}
+	if out.WatchDepth == 0 {
+		out.WatchDepth = 5
+	}
+
+	return
+}
+
+func readString(prompt, value string) string {
+	fmt.Printf("[?] %s (%s) ", prompt, value)
+	var s = value
+	fmt.Scanf("%s", &s)
+	return s
+}
+
+func genFWConfig() FWConfig {
+	var (
+		name    string
+		command string
+	)
+	cwd, _ := os.Getwd()
+	name = filepath.Base(cwd)
+	name = readString("name:", name)
+
+	for command == "" {
+		command = readString("command:", "go test -v")
+	}
+	fwc := FWConfig{
+		Description: fmt.Sprintf("Auto generated by fswatch [%s]", name),
+		Triggers: []TriggerEvent{{
+			Pattens: []string{"*.go", "*.c", "*.py"},
+			Environ: map[string]string{
+				"DEBUG": "1",
+			},
+			Command: command,
+		}},
+	}
+	out, _ := fixFWConfig(fwc)
+	return out
+}
+
+func ListAllDir(path string, depth int) (dirs []string, err error) {
 	baseNumSeps := strings.Count(path, string(os.PathSeparator))
-	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			base := info.Name()
 			if base != "." && strings.HasPrefix(base, ".") { // ignore hidden dir
@@ -117,227 +218,185 @@ func (this *gowatch) watchDirAndChildren(path string, depth int) error {
 			if pathDepth > depth {
 				return filepath.SkipDir
 			}
-			if *verbose {
-				fmt.Println(">>> watch dir: ", path)
-			}
-			if err := this.w.Watch(path); err != nil {
-				return err
-			}
+			dirs = append(dirs, path)
 		}
 		return nil
 	})
-}
-
-// Create a fsnotify fswatch
-// Initial vars
-func (this *gowatch) Watch() (err error) {
-	if this.w, err = fsnotify.NewWatcher(); err != nil {
-		return
-	}
-	for _, path := range this.Paths {
-		// translate env-vars
-		if err = this.watchDirAndChildren(os.ExpandEnv(path), this.Depth); err != nil {
-			log.Fatal(err)
-		}
-	}
-	this.modtime = make(map[string]time.Time)
-	this.sig = make(chan string)
-	for _, patten := range this.Exclude {
-		this.reExclude = append(this.reExclude, regexp.MustCompile(patten))
-	}
-	for _, patten := range this.Include {
-		this.reInclude = append(this.reInclude, regexp.MustCompile(patten))
-	}
-
-	this.sigOS = make(chan os.Signal, 1)
-	signal.Notify(this.sigOS, syscall.SIGINT)
-
-	go this.drainExec()
-	this.drainEvent()
 	return
 }
 
-// filter fsevent and send to this.sig
-func (this *gowatch) drainEvent() {
-	for {
-		select {
-		case err := <-this.w.Error:
-			log.Warnf("watch error: %s", err)
-		case <-this.sigOS:
-			this.sig <- "EXIT"
-		case eve := <-this.w.Event:
-			log.Debug(eve)
-			changed := this.IsfileChanged(eve.Name)
-			if changed && this.match(eve.Name) {
-				log.Info(eve)
-				select {
-				case this.sig <- "KILL":
-				default:
-				}
-			}
+func UniqStrings(ss []string) []string {
+	out := make([]string, 0, len(ss))
+	m := make(map[string]bool, len(ss))
+	for _, key := range ss {
+		if !m[key] {
+			out = append(out, key)
+			m[key] = true
 		}
 	}
+	return out
 }
 
-// Use modified time to judge if file changed
-func (this *gowatch) IsfileChanged(p string) bool {
-	p = filepath.Clean(p)
-	fi, err := os.Stat(p)
+func IsDirectory(path string) bool {
+	pinfo, err := os.Stat(path)
+	return err == nil && pinfo.IsDir()
+}
+
+var fileModifyTimeMap = make(map[string]time.Time)
+
+func IsChanged(path string) bool {
+	pinfo, err := os.Stat(path)
 	if err != nil {
-		return true // if file not exists, just return true
+		return true
 	}
-	curr := fi.ModTime()
-	defer func() { this.modtime[p] = curr }()
-	modt, ok := this.modtime[p]
-	return !ok || curr.After(modt.Add(time.Second))
+	mtime := pinfo.ModTime()
+	if mtime.Sub(fileModifyTimeMap[path]) > time.Millisecond*100 { // 100ms
+		fileModifyTimeMap[path] = mtime
+		return true
+	}
+	return false
 }
 
-func (this *gowatch) drainExec() {
-	log.Println("command:", this.cmd)
-	var msg string
-	for {
-		startTime := time.Now()
-		cmd := this.cmd
-		if len(cmd) == 0 {
-			cmd = []string{"echo", "no command specified"}
-		}
-		CPrintf(CGREEN, "exec start")
-		c := StartCmd(cmd[0], cmd[1:]...)
-		// Start to run command
-		err := c.Start()
-		if err != nil {
-			CPrintf("35", err.Error())
-		}
-		// Wait until killed or finished
-		select {
-		case msg = <-this.sig:
-			CPrintf(CYELLOW, "program terminated, signal(%s)", this.KillSignal)
-			if err := KillCmd(c, this.KillSignal); err != nil {
-				log.Errorf("group kill: %v", err)
-			}
-			if msg == "EXIT" {
-				os.Exit(1)
-			}
-			goto SKIP_WAITING
-		case err = <-Go(c.Wait):
-			if err != nil {
-				CPrintf(CPURPLE, "program exited: %v", err)
-			}
-		}
-		log.Infof("finish in %s", time.Since(startTime))
+// visits here for in case of duplicate paths
+func WatchPathAndChildren(w *fsnotify.Watcher, paths []string, depth int, visits map[string]bool) error {
+	if visits == nil {
+		visits = make(map[string]bool)
+	}
 
-		// Whether to restart right now
-		if this.AutoRestart {
-			goto SKIP_WAITING
+	watchDir := func(dir string) {
+		if visits[dir] {
+			return
 		}
-		CPrintf("33", "-- wait signal --")
-		if msg = <-this.sig; msg == "EXIT" {
-			os.Exit(1)
+		w.Watch(dir)
+		log.Debug("Watch directory:", dir)
+		visits[dir] = true
+	}
+	var err error
+	for _, path := range paths {
+		if visits[path] {
+			continue
 		}
-	SKIP_WAITING:
-		if this.RestartInterval > 0 {
-			log.Infof("restart after %s", this.RestartInterval)
+
+		watchDir(path)
+		dirs, er := ListAllDir(path, depth)
+		if er != nil {
+			err = er
+			log.Warnf("ERR list dir: %s, depth: %d, %v", path, depth, err)
+			continue
 		}
-		time.Sleep(this.RestartInterval)
+
+		for _, dir := range dirs {
+			watchDir(dir)
+		}
+	}
+	return err
+}
+
+func drainEvent(fwc FWConfig) (evtC chan FSEvent, wg *sync.WaitGroup, err error) {
+	evtC = make(chan FSEvent, 1)
+	wg = &sync.WaitGroup{}
+	for _, tg := range fwc.Triggers {
+		wg.Add(1)
+		go tg.WatchEvent(evtC, wg)
+	}
+	return
+}
+
+func readFWConfig(path string) (fwc FWConfig, err error) {
+	data, err := ioutil.ReadFile(FWCONFIG)
+	if err != nil {
+		return
+	}
+	err = yaml.Unmarshal(data, &fwc)
+	if err != nil {
+		return
+	}
+	// log.Println(string(data))
+	return fixFWConfig(fwc)
+}
+
+func transformEvent(fsw *fsnotify.Watcher, evtC chan FSEvent) {
+	for evt := range fsw.Event {
+		if evt.IsCreate() && IsDirectory(evt.Name) {
+			log.Info("Add watcher")
+			fsw.Watch(evt.Name)
+			continue
+		}
+		if evt.IsDelete() {
+			log.Info("Remove watcher")
+			fsw.RemoveWatch(evt.Name)
+		}
+		if !IsChanged(evt.Name) {
+			continue
+		}
+		log.Printf("Changed: %s", evt.Name)
+		evtC <- FSEvent{ // may panic here
+			Name: evt.Name,
+		}
 	}
 }
 
-const JSONCONF = ".fswatch.json"
-
-var (
-	gw = &gowatch{
-		Paths:           []string{"."},
-		Depth:           2,
-		Exclude:         []string{},
-		Include:         []string{"\\.(go|py|php|java|cpp|h|rb)$"},
-		AutoRestart:     false,
-		RestartInterval: 0,
-		KillSignal:      "KILL",
+func InitFWConfig() {
+	fwc := genFWConfig()
+	data, err := yaml.Marshal(fwc)
+	if err != nil {
+		log.Fatal(err)
 	}
-	confExists = false
-	extInclude string
-)
-
-// parse command flag
-func flagParse() {
-	gw.Env = map[string]string{"POWERD_BY": "github.com/codeskyblue/fswatch"}
-	// load JSONCONF
-	if fd, err := os.Open(JSONCONF); err == nil {
-		if er := json.NewDecoder(fd).Decode(gw); er != nil {
-			log.Fatalf("json decode error: %v", er)
-		}
-		for key, val := range gw.Env {
-			os.Setenv(key, val)
-		}
-		confExists = true
+	yn := readString(fmt.Sprintf("Save to file (%s)", FWCONFIG), "Y")
+	if strings.ToLower(yn) == "y" {
+		ioutil.WriteFile(FWCONFIG, data, 0644)
+		fmt.Println("Saved!")
+	} else {
+		fmt.Println(string(data))
 	}
-	flag.DurationVar(&gw.RestartInterval, "ri", gw.RestartInterval, "restart interval")
-	flag.BoolVar(&gw.AutoRestart, "r", gw.AutoRestart, "auto restart")
-	flag.StringVar(&gw.KillSignal, "k", gw.KillSignal, "kill signal")
-	flag.StringVar(&extInclude, "ext", "", "extention eg: [cpp,c,h]")
-	flag.Parse()
 }
 
 func main() {
-	flag.Usage = func() {
-		fmt.Printf(`Usage: fswatch [OPTIONS...] <arg...>
-OPTIONS:
-    -ext=""    Extenton seprated by , eg: cpp,c,h
-    -v         Show verbose info
+	version := flag.Bool("version", false, "Show version")
+	flag.Parse()
 
-Example:
-    fswatch -ext cpp,c,h make -f Makefile
-`)
-	}
-	flagParse()
-
-	if len(os.Args) == 1 && !confExists {
-		fmt.Printf("Create %s file [y/n]: ", strconv.Quote(JSONCONF))
-		var yn string = "y"
-		fmt.Scan(&yn)
-		gw.Command = "echo helloworld"
-		if strings.ToUpper(strings.TrimSpace(yn)) == "Y" {
-			data, _ := json.MarshalIndent(gw, "", "    ")
-			ioutil.WriteFile(JSONCONF, data, 0644)
-			fmt.Printf("use notepad++ or vim to edit %s\n", strconv.Quote(JSONCONF))
-		}
+	if *version {
+		fmt.Println(VERSION)
 		return
 	}
 
-	if flag.NArg() > 0 {
-		gw.Command = []string(flag.Args())
-	}
-	if extInclude != "" {
-		for _, ext := range strings.Split(extInclude, ",") {
-			gw.Include = append(gw.Include, "\\."+ext+"$")
-		}
-	}
-
-	// []string is unmarshaled as []interface{}
-	if v, ok := gw.Command.([]interface{}); ok {
-		cmd := make([]string, 0, len(v))
-		for _, i := range v {
-			if s, ok := i.(string); ok {
-				cmd = append(cmd, s)
-			} else {
-				log.Fatalf("check you config file. \"command\" must be string or []string, got %T", gw.Command)
-			}
-		}
-		gw.Command = cmd
-	}
-
-	switch gw.Command.(type) {
-	default:
-		log.Fatalf("check you config file. \"command\" must be string or []string, got %T", gw.Command)
-	case string:
-		if runtime.GOOS == "windows" {
-			gw.cmd = []string{"cmd", "/c", gw.Command.(string)}
+	subCmd := flag.Arg(0)
+	if subCmd == "" {
+		if _, err := os.Stat(FWCONFIG); err == nil { // .fwc.yml exists
+			subCmd = "start"
 		} else {
-			gw.cmd = []string{"bash", "-c", gw.Command.(string)}
+			subCmd = "init"
 		}
-	case []string:
-		gw.cmd = gw.Command.([]string)
 	}
 
-	log.Fatal(gw.Watch())
+	switch subCmd {
+	case "init":
+		InitFWConfig()
+	case "start":
+		fwc, err := readFWConfig(FWCONFIG)
+		if err != nil {
+			log.Fatal(err)
+		}
+		visits := make(map[string]bool)
+		fsw, _ := fsnotify.NewWatcher()
+
+		err = WatchPathAndChildren(fsw, fwc.WatchPaths, fwc.WatchDepth, visits)
+		if err != nil {
+			log.Println(err)
+		}
+
+		evtC, wg, err := drainEvent(fwc)
+
+		sigOS := make(chan os.Signal, 1)
+		signal.Notify(sigOS, syscall.SIGINT)
+
+		go func() {
+			<-sigOS
+			CPrintf(CPURPLE, "Catch signal Interrupt!")
+			close(evtC)
+		}()
+		go transformEvent(fsw, evtC)
+		wg.Wait()
+		CPrintf(CPURPLE, "Kill all running ... Done")
+	}
 }
