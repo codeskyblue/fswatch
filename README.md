@@ -1,11 +1,9 @@
 # fswatch
 [![Build Status](https://travis-ci.org/codeskyblue/fswatch.svg?branch=master)](https://travis-ci.org/codeskyblue/fswatch)
 
-**fswatch** is a command tool. Use file system event to trigger user defined commands. 
+**fswatch** is a command line tool. Watch file change and trigger commands.
 
-I reviewed the first version of fswatch(which was taged 0.1). The code I look now is shit. So I deleted almost 80% code, And left some very useful functions.
-
-This version is works fine on mac and linux. (**Support windows now**)
+This version is works well on **Mac**,**Linux** and also **Windows**.
 
 ## Install
 
@@ -25,7 +23,6 @@ triggers:
 - pattens:
   - '*.go'
   - '*.c'
-  - '*.py'
   env:
     DEBUG: "1"
   cmd: go test -v
@@ -44,14 +41,6 @@ fswatch >>> exec start: go test -v
 # github.com/codeskyblue/fswatch
 ./fswatch.go:281: main redeclared in this block
 	previous declaration at ./config.go:354
-./utils.go:18: CYELLOW redeclared in this block
-	previous declaration at ./config.go:53
-./utils.go:19: CGREEN redeclared in this block
-	previous declaration at ./config.go:54
-./utils.go:20: CPURPLE redeclared in this block
-	previous declaration at ./config.go:55
-./utils.go:23: CPrintf redeclared in this block
-	previous declaration at ./config.go:58
 fswatch >>> program exited: exit status 2
 fswatch >>> finish in 145.499911ms
 ```
@@ -92,3 +81,7 @@ Chinese Blog: <http://my.oschina.net/goskyblue/blog/194240>
 ## Friendly link: 
 * [bee](https://github.com/astaxie/bee)
 * [fsnotify](https://github.com/howeyc/fsnotify)
+
+## Code History
+I reviewed the first version of fswatch(which was taged 0.1). The code I look now is shit. So I deleted almost 80% code, And left some very useful functions.
+

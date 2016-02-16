@@ -21,7 +21,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-const FWCONFIG = ".fwc.yml"
+const FWCONFIG = ".fsw.yml"
 
 var (
 	VERSION = "2.0"
