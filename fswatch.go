@@ -106,10 +106,10 @@ func (this *TriggerEvent) Stop() {
 	}
 }
 
+// when use func (this *TriggerEvent) strange things happened, wired
 func (this *TriggerEvent) WatchEvent(evtC chan FSEvent, wg *sync.WaitGroup) {
 	this.Start()
 	for evt := range evtC {
-		// log.Println(evt)
 		isMatch, err := ignore.Matches(evt.Name, this.Pattens)
 		if err != nil {
 			log.Fatal(err)
@@ -292,13 +292,33 @@ func WatchPathAndChildren(w *fsnotify.Watcher, paths []string, depth int, visits
 	return err
 }
 
-func drainEvent(fwc FWConfig) (evtC chan FSEvent, wg *sync.WaitGroup, err error) {
-	evtC = make(chan FSEvent, 1)
+func drainEvent(fwc FWConfig) (globalEventC chan FSEvent, wg *sync.WaitGroup, err error) {
+	globalEventC = make(chan FSEvent, 1)
 	wg = &sync.WaitGroup{}
+	evtChannls := make([]chan FSEvent, 0)
+	// log.Println(len(fwc.Triggers))
 	for _, tg := range fwc.Triggers {
 		wg.Add(1)
-		go tg.WatchEvent(evtC, wg)
+		evtC := make(chan FSEvent, 1)
+		evtChannls = append(evtChannls, evtC)
+		go func(tge TriggerEvent) {
+			tge.WatchEvent(evtC, wg)
+		}(tg)
+
+		// Can't write like this, the next loop tg changed, but go .. is not finished
+		// go tg.WatchEvent(evtC, wg)
 	}
+
+	go func() {
+		for evt := range globalEventC {
+			for _, eC := range evtChannls {
+				eC <- evt
+			}
+		}
+		for _, eC := range evtChannls {
+			close(eC)
+		}
+	}()
 	return
 }
 
@@ -311,8 +331,10 @@ func readFWConfig(path string) (fwc FWConfig, err error) {
 	if err != nil {
 		return
 	}
-	// log.Println(string(data))
-	return fixFWConfig(fwc)
+	fwc, err = fixFWConfig(fwc)
+	// data, _ = json.MarshalIndent(fwc, "", "    ")
+	// fmt.Println(string(data))
+	return
 }
 
 func transformEvent(fsw *fsnotify.Watcher, evtC chan FSEvent) {
