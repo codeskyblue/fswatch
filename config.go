@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	ignore "github.com/codeskyblue/dockerignore"
 	"github.com/codeskyblue/kexec"
 	"github.com/howeyc/fsnotify"
 	yaml "gopkg.in/yaml.v2"
@@ -231,6 +232,14 @@ func main() {
 		if IsChanged(evt.Name) {
 			log.Printf("IsChanged: %s", evt.Name)
 		}
+
+		rd := ioutil.NopCloser(bytes.NewBufferString("*.exe"))
+		patterns, err := ignore.ReadIgnore(rd)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		log.Println(patterns)
 	}
 	return
 
