@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -9,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -21,7 +24,10 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-const FWCONFIG = ".fsw.yml"
+const (
+	FWCONFIG_YAML = ".fsw.yml"
+	FWCONFIG_JSON = ".fsw.json"
+)
 
 var (
 	VERSION = "2.0"
@@ -63,14 +69,14 @@ func CPrintf(ansiColor string, format string, args ...interface{}) {
 }
 
 type TriggerEvent struct {
-	Pattens       []string          `yaml:"pattens"`
-	matchPattens  []string          `yaml:"-"`
-	Environ       map[string]string `yaml:"env"`
-	Command       string            `yaml:"cmd"`
-	Delay         string            `yaml:"delay"`
-	delayDuration time.Duration     `yaml:"-"`
-	Signal        string            `yaml:"signal"`
-	killSignal    os.Signal         `yaml:"-"`
+	Pattens       []string          `yaml:"pattens" json:"pattens"`
+	matchPattens  []string          `yaml:"-" json:"-"`
+	Environ       map[string]string `yaml:"env" json:"env"`
+	Command       string            `yaml:"cmd" json:"cmd"`
+	Delay         string            `yaml:"delay" json:"delay"`
+	delayDuration time.Duration     `yaml:"-" json:"-"`
+	Signal        string            `yaml:"signal" json:"signal"`
+	killSignal    os.Signal         `yaml:"-" json:"-"`
 	kcmd          *kexec.KCommand
 }
 
@@ -131,10 +137,10 @@ type FSEvent struct {
 }
 
 type FWConfig struct {
-	Description string         `yaml:"desc"`
-	Triggers    []TriggerEvent `yaml:"triggers"`
-	WatchPaths  []string       `yaml:"watch_paths"`
-	WatchDepth  int            `yaml:"watch_depth"`
+	Description string         `yaml:"desc" json:"desc"`
+	Triggers    []TriggerEvent `yaml:"triggers" json:"triggers"`
+	WatchPaths  []string       `yaml:"watch_paths" json:"watch_paths"`
+	WatchDepth  int            `yaml:"watch_depth" json:"watch_depth"`
 }
 
 func fixFWConfig(in FWConfig) (out FWConfig, err error) {
@@ -154,7 +160,6 @@ func fixFWConfig(in FWConfig) (out FWConfig, err error) {
 		outTg.killSignal = signalMaps[outTg.Signal]
 
 		rd := ioutil.NopCloser(bytes.NewBufferString(strings.Join(outTg.Pattens, "\n")))
-		// rd := ioutil.NopCloser(bytes.NewBufferString("*.exe"))
 		patterns, er := ignore.ReadIgnore(rd)
 		if er != nil {
 			err = er
@@ -322,19 +327,32 @@ func drainEvent(fwc FWConfig) (globalEventC chan FSEvent, wg *sync.WaitGroup, er
 	return
 }
 
-func readFWConfig(path string) (fwc FWConfig, err error) {
-	data, err := ioutil.ReadFile(FWCONFIG)
-	if err != nil {
-		return
+func readFWConfig(paths ...string) (fwc FWConfig, err error) {
+	for _, cfgPath := range paths {
+		data, err := ioutil.ReadFile(cfgPath)
+		if err != nil {
+			continue
+		}
+		ext := filepath.Ext(cfgPath)
+		switch ext {
+		case ".yml":
+			if er := yaml.Unmarshal(data, &fwc); er != nil {
+				return fwc, er
+			}
+		case ".json":
+			if er := json.Unmarshal(data, &fwc); er != nil {
+				return fwc, er
+			}
+		default:
+			err = fmt.Errorf("Unknown format config file: %s", cfgPath)
+			return fwc, err
+		}
+		return fixFWConfig(fwc)
 	}
-	err = yaml.Unmarshal(data, &fwc)
-	if err != nil {
-		return
-	}
-	fwc, err = fixFWConfig(fwc)
+	//fwc, err = fixFWConfig(fwc)
 	// data, _ = json.MarshalIndent(fwc, "", "    ")
 	// fmt.Println(string(data))
-	return
+	return fwc, errors.New("Config file not exists")
 }
 
 func transformEvent(fsw *fsnotify.Watcher, evtC chan FSEvent) {
@@ -360,17 +378,19 @@ func transformEvent(fsw *fsnotify.Watcher, evtC chan FSEvent) {
 
 func InitFWConfig() {
 	fwc := genFWConfig()
-	data, err := yaml.Marshal(fwc)
-	if err != nil {
-		log.Fatal(err)
-	}
-	yn := readString(fmt.Sprintf("Save to file (%s)", FWCONFIG), "Y")
-	if strings.ToLower(yn) == "y" {
-		ioutil.WriteFile(FWCONFIG, data, 0644)
-		fmt.Println("Saved!")
+	format := readString("Save format .fsw.(json|yml)", "yml")
+	var data []byte
+	var cfg string
+	if strings.ToLower(format) == "json" {
+		data, _ = json.MarshalIndent(fwc, "", "  ")
+		cfg = FWCONFIG_JSON
+		ioutil.WriteFile(FWCONFIG_JSON, data, 0644)
 	} else {
-		fmt.Println(string(data))
+		cfg = FWCONFIG_YAML
+		data, _ = yaml.Marshal(fwc)
+		ioutil.WriteFile(FWCONFIG_YAML, data, 0644)
 	}
+	fmt.Printf("Saved to %s\n", strconv.Quote(cfg))
 }
 
 func main() {
@@ -383,8 +403,11 @@ func main() {
 	}
 
 	subCmd := flag.Arg(0)
+	var fwc FWConfig
+	var err error
 	if subCmd == "" {
-		if _, err := os.Stat(FWCONFIG); err == nil { // .fwc.yml exists
+		fwc, err = readFWConfig(FWCONFIG_JSON, FWCONFIG_YAML)
+		if err == nil {
 			subCmd = "start"
 		} else {
 			subCmd = "init"
@@ -395,10 +418,6 @@ func main() {
 	case "init":
 		InitFWConfig()
 	case "start":
-		fwc, err := readFWConfig(FWCONFIG)
-		if err != nil {
-			log.Fatal(err)
-		}
 		visits := make(map[string]bool)
 		fsw, _ := fsnotify.NewWatcher()
 
@@ -408,6 +427,9 @@ func main() {
 		}
 
 		evtC, wg, err := drainEvent(fwc)
+		if err != nil {
+			log.Fatal(err)
+		}
 
 		sigOS := make(chan os.Signal, 1)
 		signal.Notify(sigOS, syscall.SIGINT)
