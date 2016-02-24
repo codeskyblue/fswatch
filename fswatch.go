@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"runtime"
@@ -22,6 +23,7 @@ import (
 	"github.com/codeskyblue/kexec"
 	"github.com/go-fsnotify/fsnotify"
 	"github.com/gobuild/log"
+	"github.com/google/shlex"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -31,7 +33,7 @@ const (
 )
 
 var (
-	VERSION = "2.0"
+	VERSION = "2.1"
 )
 
 var signalMaps = map[string]os.Signal{
@@ -79,6 +81,8 @@ type TriggerEvent struct {
 	matchPattens  []string          `yaml:"-" json:"-"`
 	Environ       map[string]string `yaml:"env" json:"env"`
 	Command       string            `yaml:"cmd" json:"cmd"`
+	Shell         bool              `yaml:"shell" json:"shell"`
+	cmdArgs       []string          `yaml:"-" json:"-"`
 	Delay         string            `yaml:"delay" json:"delay"`
 	delayDuration time.Duration     `yaml:"-" json:"-"`
 	Signal        string            `yaml:"signal" json:"signal"`
@@ -86,41 +90,64 @@ type TriggerEvent struct {
 	kcmd          *kexec.KCommand
 }
 
-func (this *TriggerEvent) Start() error {
-	CPrintf(CGREEN, fmt.Sprintf("[%s] exec start: %s", this.Name, this.Command))
+func (this *TriggerEvent) Start() (waitC chan error) {
+	CPrintf(CGREEN, fmt.Sprintf("[%s] exec start: %v", this.Name, this.cmdArgs))
 	startTime := time.Now()
-	cmd := kexec.CommandString(this.Command)
+	cmd := kexec.Command(this.cmdArgs[0], this.cmdArgs[1:]...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	env := os.Environ()
 	for key, val := range this.Environ {
 		env = append(env, fmt.Sprintf("%s=%s", key, val))
 	}
 	cmd.Env = env
 	this.kcmd = cmd
-	err := cmd.Start()
+	waitC = make(chan error, 1)
+	if err := cmd.Start(); err != nil {
+		waitC <- err
+		return
+	}
 	go func() {
-		if er := cmd.Wait(); er != nil {
-			CPrintf(CRED, "[%s] program exited: %v", this.Name, er)
-		}
+		//var er error
+		waitC <- cmd.Wait()
 		log.Infof("[%s] finish in %s", this.Name, time.Since(startTime))
 	}()
-	return err
+	return waitC
 }
 
-func (this *TriggerEvent) Stop() {
+func (this *TriggerEvent) Stop(waitC chan error) bool {
 	if this.kcmd != nil {
 		if this.kcmd.ProcessState != nil && this.kcmd.ProcessState.Exited() {
 			this.kcmd = nil
-			return
+			return true
 		}
 		this.kcmd.Terminate(this.killSignal)
-		CPrintf(CYELLOW, "[%s] program terminated, signal(%v)", this.Name, this.killSignal)
-		this.kcmd = nil
+		var done bool
+		select {
+		case err := <-waitC:
+			if err != nil {
+				CPrintf(CRED, "[%s] program exited: %v", this.Name, err)
+			}
+			done = true
+		case <-time.After(500 * time.Millisecond): // todo: timeout need to be set in conf.
+			done = false
+		}
+		if !done {
+			CPrintf(CYELLOW, "[%s] program still alive", this.Name)
+			//<-waitC
+			//CPrintf(CYELLOW, "[%s] program still alive, force kill", this.Name)
+			//	this.kcmd.Terminate(syscall.SIGKILL)
+		} else {
+			this.kcmd = nil
+		}
+		return done
 	}
+	return true
 }
 
 // when use func (this *TriggerEvent) strange things happened, wired
 func (this *TriggerEvent) WatchEvent(evtC chan FSEvent, wg *sync.WaitGroup) {
-	this.Start()
+	waitC := this.Start()
 	for evt := range evtC {
 		isMatch, err := ignore.Matches(evt.Name, this.Pattens)
 		if err != nil {
@@ -129,13 +156,16 @@ func (this *TriggerEvent) WatchEvent(evtC chan FSEvent, wg *sync.WaitGroup) {
 		if !isMatch {
 			continue
 		}
-		this.Stop()
-		CPrintf(CGREEN, "changed: %v", evt.Name)
-		CPrintf(CGREEN, "delay: %v", this.Delay)
-		time.Sleep(this.delayDuration)
-		this.Start()
+		if this.Stop(waitC) {
+			CPrintf(CGREEN, "changed: %v", evt.Name)
+			CPrintf(CGREEN, "delay: %v", this.Delay)
+			time.Sleep(this.delayDuration)
+			waitC = this.Start()
+		}
 	}
-	this.Stop()
+	// force kill when exit
+	this.killSignal = syscall.SIGKILL
+	this.Stop(waitC)
 	wg.Done()
 }
 
@@ -150,6 +180,20 @@ type FWConfig struct {
 	WatchDepth  int            `yaml:"watch_depth" json:"watch_depth"`
 }
 
+func getShell() ([]string, error) {
+	if path, err := exec.LookPath("bash"); err == nil {
+		return []string{path, "-c"}, nil
+	}
+	if path, err := exec.LookPath("sh"); err == nil {
+		return []string{path, "-c"}, nil
+	}
+	// even windows, there still has git-bash or mingw
+	if runtime.GOOS == "windows" {
+		return []string{"cmd", "/c"}, nil
+	}
+	return nil, fmt.Errorf("Could not find bash or sh on path.")
+}
+
 func fixFWConfig(in FWConfig) (out FWConfig, err error) {
 	out = in
 	for idx, trigger := range in.Triggers {
@@ -162,7 +206,7 @@ func fixFWConfig(in FWConfig) (out FWConfig, err error) {
 			return
 		}
 		if outTg.Signal == "" {
-			outTg.Signal = "HUP"
+			outTg.Signal = "KILL"
 		}
 		outTg.killSignal = signalMaps[outTg.Signal]
 
@@ -173,6 +217,23 @@ func fixFWConfig(in FWConfig) (out FWConfig, err error) {
 			return
 		}
 		outTg.matchPattens = patterns
+		if outTg.Shell {
+			sh, er := getShell()
+			if er != nil {
+				err = er
+				return
+			}
+			outTg.cmdArgs = append(sh, outTg.Command)
+		} else {
+			outTg.cmdArgs, err = shlex.Split(outTg.Command)
+			if err != nil {
+				return
+			}
+			if len(outTg.cmdArgs) == 0 {
+				err = errors.New("No command defined")
+				return
+			}
+		}
 	}
 	if len(out.WatchPaths) == 0 {
 		out.WatchPaths = append(out.WatchPaths, ".")
@@ -204,6 +265,10 @@ func genFWConfig() FWConfig {
 		fmt.Print("[?] command (go test -v): ")
 		reader := bufio.NewReader(os.Stdin)
 		command, _ = reader.ReadString('\n')
+		command = strings.TrimSpace(command)
+		if command == "" {
+			command = "go test -v"
+		}
 	}
 	fwc := FWConfig{
 		Description: fmt.Sprintf("Auto generated by fswatch [%s]", name),
@@ -212,6 +277,7 @@ func genFWConfig() FWConfig {
 			Environ: map[string]string{
 				"DEBUG": "1",
 			},
+			Shell:   true,
 			Command: command,
 		}},
 	}
