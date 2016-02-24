@@ -94,3 +94,10 @@ Chinese Blog: <http://my.oschina.net/goskyblue/blog/194240>
 ## Code History
 I reviewed the first version of fswatch(which was taged 0.1). The code I look now is shit. So I deleted almost 80% code, And left some very useful functions.
 
+## Alternative
+* <https://github.com/cortesi/modd>
+* <https://github.com/emcrisostomo/fswatch> write with cpp
+* <https://github.com/Unknwon/bra> Funny name.
+
+## LICENSE
+Under [MIT](LICENSE)
