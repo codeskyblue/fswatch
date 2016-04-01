@@ -472,6 +472,7 @@ func InitFWConfig() {
 
 func main() {
 	version := flag.Bool("version", false, "Show version")
+	configfile := flag.String("config", FWCONFIG_YAML, "Specify config file")
 	flag.Parse()
 
 	if *version {
@@ -483,7 +484,7 @@ func main() {
 	var fwc FWConfig
 	var err error
 	if subCmd == "" {
-		fwc, err = readFWConfig(FWCONFIG_JSON, FWCONFIG_YAML)
+		fwc, err = readFWConfig(*configfile, FWCONFIG_JSON)
 		if err == nil {
 			subCmd = "start"
 		} else {
