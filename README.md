@@ -9,6 +9,10 @@ Works well on Mac, Linux, and should also works on Windows(not well tested).
 ```
 go get -u -v github.com/codeskyblue/fswatch
 ```
+OR
+```
+curl -s https://raw.githubusercontent.com/franciscocpg/fswatch/master/install.sh | sudo sh
+```
 
 ## Quick start
 ### Step 1
