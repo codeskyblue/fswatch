@@ -24,4 +24,3 @@ _testmain.go
 
 *.exe
 fswatch
-dist/
