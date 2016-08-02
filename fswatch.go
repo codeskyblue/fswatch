@@ -87,7 +87,7 @@ type TriggerEvent struct {
 	delayDuration time.Duration     `yaml:"-" json:"-"`
 	Signal        string            `yaml:"signal" json:"signal"`
 	killSignal    os.Signal         `yaml:"-" json:"-"`
-	KillSignal    string            `yaml:"killSignal" json:"killSignal"`
+	KillSignal    string            `yaml:"kill_signal" json:"kill_signal"`
 	exitSignal    os.Signal
 	kcmd          *kexec.KCommand
 }

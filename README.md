@@ -32,7 +32,7 @@ triggers:
   cmd: go test -v
   delay: 100ms
   signal: "KILL"
-  killSignal: "SIGTERM"
+  kill_signal: "SIGTERM"
 watch_paths:
 - .
 watch_depth: 5
