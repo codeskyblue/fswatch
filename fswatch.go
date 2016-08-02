@@ -33,7 +33,7 @@ const (
 )
 
 var (
-	VERSION = "2.1"
+	VERSION = "2.2"
 )
 
 var signalMaps = map[string]os.Signal{
@@ -87,6 +87,8 @@ type TriggerEvent struct {
 	delayDuration time.Duration     `yaml:"-" json:"-"`
 	Signal        string            `yaml:"signal" json:"signal"`
 	killSignal    os.Signal         `yaml:"-" json:"-"`
+	KillSignal    string            `yaml:"kill_signal" json:"kill_signal"`
+	exitSignal    os.Signal
 	kcmd          *kexec.KCommand
 }
 
@@ -163,8 +165,9 @@ func (this *TriggerEvent) WatchEvent(evtC chan FSEvent, wg *sync.WaitGroup) {
 			waitC = this.Start()
 		}
 	}
+
 	// force kill when exit
-	this.killSignal = syscall.SIGKILL
+	this.killSignal = this.exitSignal
 	this.Stop(waitC)
 	wg.Done()
 }
@@ -209,6 +212,11 @@ func fixFWConfig(in FWConfig) (out FWConfig, err error) {
 			outTg.Signal = "KILL"
 		}
 		outTg.killSignal = signalMaps[outTg.Signal]
+		if outTg.KillSignal == "" {
+			outTg.exitSignal = syscall.SIGKILL
+		} else {
+			outTg.exitSignal = signalMaps[outTg.KillSignal]
+		}
 
 		rd := ioutil.NopCloser(bytes.NewBufferString(strings.Join(outTg.Pattens, "\n")))
 		patterns, er := ignore.ReadIgnore(rd)
