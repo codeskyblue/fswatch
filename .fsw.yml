@@ -12,4 +12,6 @@ triggers:
   name: echo
 watch_paths:
 - .
+#watch_skips:
+#- '!vendor'
 watch_depth: 5

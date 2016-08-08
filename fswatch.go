@@ -33,7 +33,7 @@ const (
 )
 
 var (
-	VERSION = "2.2"
+	VERSION = "2.2.dev1"
 )
 
 var signalMaps = map[string]os.Signal{
@@ -73,6 +73,17 @@ func CPrintf(ansiColor string, format string, args ...interface{}) {
 		format = "\033[" + ansiColor + "m" + format + "\033[0m"
 	}
 	log.Printf(format, args...)
+}
+
+type FSEvent struct {
+	Name string
+}
+
+type FWConfig struct {
+	Description string         `yaml:"desc" json:"desc"`
+	Triggers    []TriggerEvent `yaml:"triggers" json:"triggers"`
+	WatchPaths  []string       `yaml:"watch_paths" json:"watch_paths"`
+	WatchDepth  int            `yaml:"watch_depth" json:"watch_depth"`
 }
 
 type TriggerEvent struct {
@@ -170,17 +181,6 @@ func (this *TriggerEvent) WatchEvent(evtC chan FSEvent, wg *sync.WaitGroup) {
 	this.killSignal = this.exitSignal
 	this.Stop(waitC)
 	wg.Done()
-}
-
-type FSEvent struct {
-	Name string
-}
-
-type FWConfig struct {
-	Description string         `yaml:"desc" json:"desc"`
-	Triggers    []TriggerEvent `yaml:"triggers" json:"triggers"`
-	WatchPaths  []string       `yaml:"watch_paths" json:"watch_paths"`
-	WatchDepth  int            `yaml:"watch_depth" json:"watch_depth"`
 }
 
 func getShell() ([]string, error) {
@@ -351,13 +351,17 @@ func WatchPathAndChildren(w *fsnotify.Watcher, paths []string, depth int, visits
 		visits = make(map[string]bool)
 	}
 
-	watchDir := func(dir string) {
+	watchDir := func(dir string) error {
 		if visits[dir] {
-			return
+			return nil
 		}
-		w.Add(dir)
+		if err := w.Add(dir); err != nil {
+			log.Fatalf("Watch directory(%s) error: %v", dir, err)
+			return err
+		}
 		log.Debug("Watch directory:", dir)
 		visits[dir] = true
+		return nil
 	}
 	var err error
 	for _, path := range paths {
@@ -439,6 +443,11 @@ func readFWConfig(paths ...string) (fwc FWConfig, err error) {
 }
 
 func transformEvent(fsw *fsnotify.Watcher, evtC chan FSEvent) {
+	go func() {
+		for err := range fsw.Errors {
+			log.Errorf("Watch error: %v", err)
+		}
+	}()
 	for evt := range fsw.Events {
 		if evt.Op == fsnotify.Create && IsDirectory(evt.Name) {
 			log.Info("Add watcher", evt.Name)
@@ -461,7 +470,7 @@ func transformEvent(fsw *fsnotify.Watcher, evtC chan FSEvent) {
 	}
 }
 
-func InitFWConfig() {
+func initFWConfig() {
 	fwc := genFWConfig()
 	format := readString("Save format .fsw.(json|yml)", "yml")
 	var data []byte
@@ -502,10 +511,13 @@ func main() {
 
 	switch subCmd {
 	case "init":
-		InitFWConfig()
+		initFWConfig()
 	case "start":
 		visits := make(map[string]bool)
-		fsw, _ := fsnotify.NewWatcher()
+		fsw, err := fsnotify.NewWatcher()
+		if err != nil {
+			log.Fatal(err)
+		}
 
 		err = WatchPathAndChildren(fsw, fwc.WatchPaths, fwc.WatchDepth, visits)
 		if err != nil {
