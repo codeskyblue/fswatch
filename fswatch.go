@@ -246,8 +246,8 @@ func fixFWConfig(in FWConfig) (out FWConfig, err error) {
 	if len(out.WatchPaths) == 0 {
 		out.WatchPaths = append(out.WatchPaths, ".")
 	}
-	if out.WatchDepth == 0 {
-		out.WatchDepth = 5
+	if out.WatchDepth < 0 {
+		out.WatchDepth = 0
 	}
 
 	return
@@ -356,10 +356,14 @@ func WatchPathAndChildren(w *fsnotify.Watcher, paths []string, depth int, visits
 			return nil
 		}
 		if err := w.Add(dir); err != nil {
-			log.Fatalf("Watch directory(%s) error: %v", dir, err)
+			if strings.Contains(err.Error(), "too many open files") {
+				log.Fatalf("Watch directory(%s) error: %v", dir, err)
+			}
+			log.Warnf("Watch directory(%s) error: %v", dir, err)
 			return err
 		}
 		log.Debug("Watch directory:", dir)
+		//log.Info("Watch directory:", dir)
 		visits[dir] = true
 		return nil
 	}

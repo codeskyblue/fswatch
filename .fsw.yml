@@ -14,4 +14,4 @@ watch_paths:
 - .
 #watch_skips:
 #- '!vendor'
-watch_depth: 5
+watch_depth: 0
