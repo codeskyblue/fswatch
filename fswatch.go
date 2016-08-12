@@ -33,7 +33,7 @@ const (
 )
 
 var (
-	VERSION = "2.2.dev1"
+	VERSION = "2.3"
 )
 
 var signalMaps = map[string]os.Signal{
@@ -87,20 +87,22 @@ type FWConfig struct {
 }
 
 type TriggerEvent struct {
-	Name          string            `yaml:"name" json:"name"`
-	Pattens       []string          `yaml:"pattens" json:"pattens"`
-	matchPattens  []string          `yaml:"-" json:"-"`
-	Environ       map[string]string `yaml:"env" json:"env"`
-	Command       string            `yaml:"cmd" json:"cmd"`
-	Shell         bool              `yaml:"shell" json:"shell"`
-	cmdArgs       []string          `yaml:"-" json:"-"`
-	Delay         string            `yaml:"delay" json:"delay"`
-	delayDuration time.Duration     `yaml:"-" json:"-"`
-	Signal        string            `yaml:"signal" json:"signal"`
-	killSignal    os.Signal         `yaml:"-" json:"-"`
-	KillSignal    string            `yaml:"kill_signal" json:"kill_signal"`
-	exitSignal    os.Signal
-	kcmd          *kexec.KCommand
+	Name                string            `yaml:"name" json:"name"`
+	Pattens             []string          `yaml:"pattens" json:"pattens"`
+	matchPattens        []string          `yaml:"-" json:"-"`
+	Environ             map[string]string `yaml:"env" json:"env"`
+	Command             string            `yaml:"cmd" json:"cmd"`
+	Shell               bool              `yaml:"shell" json:"shell"`
+	cmdArgs             []string          `yaml:"-" json:"-"`
+	Delay               string            `yaml:"delay" json:"delay"`
+	delayDuration       time.Duration     `yaml:"-" json:"-"`
+	StopTimeout         string            `yaml:"stop_timeout" json:"stop_timeout"`
+	stopTimeoutDuration time.Duration     `yaml:"-" json:"-"`
+	Signal              string            `yaml:"signal" json:"signal"`
+	killSignal          os.Signal         `yaml:"-" json:"-"`
+	KillSignal          string            `yaml:"kill_signal" json:"kill_signal"`
+	exitSignal          os.Signal
+	kcmd                *kexec.KCommand
 }
 
 func (this *TriggerEvent) Start() (waitC chan error) {
@@ -142,7 +144,7 @@ func (this *TriggerEvent) Stop(waitC chan error) bool {
 				CPrintf(CRED, "[%s] program exited: %v", this.Name, err)
 			}
 			done = true
-		case <-time.After(500 * time.Millisecond): // todo: timeout need to be set in conf.
+		case <-time.After(this.stopTimeoutDuration):
 			done = false
 		}
 		if !done {
@@ -205,6 +207,13 @@ func fixFWConfig(in FWConfig) (out FWConfig, err error) {
 			outTg.Delay = "100ms"
 		}
 		outTg.delayDuration, err = time.ParseDuration(outTg.Delay)
+		if err != nil {
+			return
+		}
+		if trigger.StopTimeout == "" {
+			outTg.Delay = "500ms"
+		}
+		outTg.stopTimeoutDuration, err = time.ParseDuration(outTg.StopTimeout)
 		if err != nil {
 			return
 		}
