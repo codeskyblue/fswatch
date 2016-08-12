@@ -211,7 +211,7 @@ func fixFWConfig(in FWConfig) (out FWConfig, err error) {
 			return
 		}
 		if trigger.StopTimeout == "" {
-			outTg.Delay = "500ms"
+			outTg.StopTimeout = "500ms"
 		}
 		outTg.stopTimeoutDuration, err = time.ParseDuration(outTg.StopTimeout)
 		if err != nil {
