@@ -109,6 +109,7 @@ func (this *TriggerEvent) Start() (waitC chan error) {
 	CPrintf(CGREEN, fmt.Sprintf("[%s] exec start: %v", this.Name, this.cmdArgs))
 	startTime := time.Now()
 	cmd := kexec.Command(this.cmdArgs[0], this.cmdArgs[1:]...)
+	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	env := os.Environ()
