@@ -311,6 +311,9 @@ func ListAllDir(path string, depth int) (dirs []string, err error) {
 			if base != "." && strings.HasPrefix(base, ".") { // ignore hidden dir
 				return filepath.SkipDir
 			}
+			if base == "node_modules" {
+				return filepath.SkipDir
+			}
 
 			pathDepth := strings.Count(path, string(os.PathSeparator)) - baseNumSeps
 			if pathDepth > depth {
