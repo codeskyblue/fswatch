@@ -359,7 +359,8 @@ func IsChanged(path string) bool {
 }
 
 // visits here for in case of duplicate paths
-func WatchPathAndChildren(w *fsnotify.Watcher, paths []string, depth int, visits map[string]bool) error {
+func WatchPathAndChildren(w *fsnotify.Watcher, config FWConfig, visits map[string]bool) error {
+	depth := config.WatchDepth
 	if visits == nil {
 		visits = make(map[string]bool)
 	}
@@ -368,6 +369,15 @@ func WatchPathAndChildren(w *fsnotify.Watcher, paths []string, depth int, visits
 		if visits[dir] {
 			return nil
 		}
+
+		isMatches, err := matches(dir, config)
+		if err != nil {
+			return err
+		}
+		if !isMatches && dir != "." {
+			return nil
+		}
+
 		if err := w.Add(dir); err != nil {
 			if strings.Contains(err.Error(), "too many open files") {
 				log.Fatalf("Watch directory(%s) error: %v", dir, err)
@@ -381,7 +391,7 @@ func WatchPathAndChildren(w *fsnotify.Watcher, paths []string, depth int, visits
 		return nil
 	}
 	var err error
-	for _, path := range paths {
+	for _, path := range config.WatchPaths {
 		if visits[path] {
 			continue
 		}
@@ -399,6 +409,14 @@ func WatchPathAndChildren(w *fsnotify.Watcher, paths []string, depth int, visits
 		}
 	}
 	return err
+}
+
+func matches(dir string, config FWConfig) (bool, error) {
+	if len(config.Triggers) == 0 {
+		return false, errors.New("no triggers")
+	}
+
+	return ignore.Matches(dir, config.Triggers[0].Pattens)
 }
 
 func drainEvent(fwc FWConfig) (globalEventC chan FSEvent, wg *sync.WaitGroup, err error) {
@@ -536,7 +554,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		err = WatchPathAndChildren(fsw, fwc.WatchPaths, fwc.WatchDepth, visits)
+		err = WatchPathAndChildren(fsw, fwc, visits)
 		if err != nil {
 			log.Println(err)
 		}
