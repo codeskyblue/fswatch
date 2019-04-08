@@ -1,36 +1,36 @@
 {
-	"ImportPath": "github.com/codeskyblue/fswatch",
-	"GoVersion": "go1.6",
-	"GodepVersion": "v74",
-	"Deps": [
-		{
-			"ImportPath": "github.com/codeskyblue/dockerignore",
-			"Rev": "de82dee623d9207f906d327172149cba50427a88"
-		},
-		{
-			"ImportPath": "github.com/codeskyblue/kexec",
-			"Rev": "b7e1983cb3267c8862794eacf39b14386dfa441f"
-		},
-		{
-			"ImportPath": "github.com/go-fsnotify/fsnotify",
-			"Comment": "v1.3.1",
-			"Rev": "a8a77c9133d2d6fd8334f3260d06f60e8d80a5fb"
-		},
-		{
-			"ImportPath": "github.com/gobuild/log",
-			"Rev": "f1f03dc733eb8acf247f889dd103ee1de1a06caa"
-		},
-		{
-			"ImportPath": "github.com/google/shlex",
-			"Rev": "6f45313302b9c56850fc17f99e40caebce98c716"
-		},
-		{
-			"ImportPath": "golang.org/x/sys/unix",
-			"Rev": "a646d33e2ee3172a661fc09bca23bb4889a41bc8"
-		},
-		{
-			"ImportPath": "gopkg.in/yaml.v2",
-			"Rev": "f7716cbe52baa25d2e9b0d0da546fcf909fc16b4"
-		}
-	]
+  "ImportPath": "github.com/codeskyblue/fswatch",
+  "GoVersion": "go1.6",
+  "GodepVersion": "v74",
+  "Deps": [
+    {
+      "ImportPath": "github.com/codeskyblue/dockerignore",
+      "Rev": "de82dee623d9207f906d327172149cba50427a88"
+    },
+    {
+      "ImportPath": "github.com/codeskyblue/kexec",
+      "Rev": "b7e1983cb3267c8862794eacf39b14386dfa441f"
+    },
+    {
+      "ImportPath": "github.com/fsnotify/fsnotify",
+      "Comment": "v1.3.1",
+      "Rev": "c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9"
+    },
+    {
+      "ImportPath": "github.com/gobuild/log",
+      "Rev": "f1f03dc733eb8acf247f889dd103ee1de1a06caa"
+    },
+    {
+      "ImportPath": "github.com/google/shlex",
+      "Rev": "6f45313302b9c56850fc17f99e40caebce98c716"
+    },
+    {
+      "ImportPath": "golang.org/x/sys/unix",
+      "Rev": "a646d33e2ee3172a661fc09bca23bb4889a41bc8"
+    },
+    {
+      "ImportPath": "gopkg.in/yaml.v2",
+      "Rev": "f7716cbe52baa25d2e9b0d0da546fcf909fc16b4"
+    }
+  ]
 }
