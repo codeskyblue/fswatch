@@ -21,10 +21,10 @@ import (
 
 	ignore "github.com/codeskyblue/dockerignore"
 	"github.com/codeskyblue/kexec"
-	"github.com/go-fsnotify/fsnotify"
+	"github.com/fsnotify/fsnotify"
 	"github.com/gobuild/log"
 	"github.com/google/shlex"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 )
 
 const (
