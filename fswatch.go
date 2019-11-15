@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -21,6 +20,7 @@ import (
 
 	ignore "github.com/codeskyblue/dockerignore"
 	"github.com/codeskyblue/kexec"
+	"github.com/frioux/shellquote"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gobuild/log"
 	"github.com/google/shlex"
@@ -33,7 +33,7 @@ const (
 )
 
 var (
-	VERSION = "2.3"
+	VERSION = "3.0"
 )
 
 var signalMaps = map[string]os.Signal{
@@ -106,7 +106,8 @@ type TriggerEvent struct {
 }
 
 func (this *TriggerEvent) Start() (waitC chan error) {
-	CPrintf(CGREEN, fmt.Sprintf("[%s] exec start: %v", this.Name, this.cmdArgs))
+	cmdString, _ := shellquote.Quote(this.cmdArgs)
+	CPrintf(CGREEN, fmt.Sprintf("[%s] exec start: %v", this.Name, cmdString))
 	startTime := time.Now()
 	cmd := kexec.Command(this.cmdArgs[0], this.cmdArgs[1:]...)
 	cmd.Stdin = os.Stdin
@@ -303,29 +304,6 @@ func genFWConfig() FWConfig {
 	return out
 }
 
-func ListAllDir(path string, depth int) (dirs []string, err error) {
-	baseNumSeps := strings.Count(path, string(os.PathSeparator))
-	err = filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
-		if info.IsDir() {
-			base := info.Name()
-			if base != "." && strings.HasPrefix(base, ".") { // ignore hidden dir
-				return filepath.SkipDir
-			}
-			if base == "node_modules" {
-				return filepath.SkipDir
-			}
-
-			pathDepth := strings.Count(path, string(os.PathSeparator)) - baseNumSeps
-			if pathDepth > depth {
-				return filepath.SkipDir
-			}
-			dirs = append(dirs, path)
-		}
-		return nil
-	})
-	return
-}
-
 func UniqStrings(ss []string) []string {
 	out := make([]string, 0, len(ss))
 	m := make(map[string]bool, len(ss))
@@ -376,7 +354,6 @@ func WatchPathAndChildren(w *fsnotify.Watcher, paths []string, depth int, visits
 			return err
 		}
 		log.Debug("Watch directory:", dir)
-		//log.Info("Watch directory:", dir)
 		visits[dir] = true
 		return nil
 	}
@@ -387,7 +364,7 @@ func WatchPathAndChildren(w *fsnotify.Watcher, paths []string, depth int, visits
 		}
 
 		watchDir(path)
-		dirs, er := ListAllDir(path, depth)
+		dirs, er := listAllDir(path, depth)
 		if er != nil {
 			err = er
 			log.Warnf("ERR list dir: %s, depth: %d, %v", path, depth, err)
@@ -399,6 +376,30 @@ func WatchPathAndChildren(w *fsnotify.Watcher, paths []string, depth int, visits
 		}
 	}
 	return err
+}
+
+func listAllDir(path string, depth int) (dirs []string, err error) {
+	baseNumSeps := strings.Count(path, string(os.PathSeparator))
+	err = filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			base := info.Name()
+			if base != "." && strings.HasPrefix(base, ".") { // ignore hidden dir
+				return filepath.SkipDir
+			}
+			if base == "node_modules" {
+				return filepath.SkipDir
+			}
+
+			pathDepth := strings.Count(path, string(os.PathSeparator)) - baseNumSeps
+			if pathDepth > depth {
+				return filepath.SkipDir
+			}
+
+			dirs = append(dirs, path)
+		}
+		return nil
+	})
+	return
 }
 
 func drainEvent(fwc FWConfig) (globalEventC chan FSEvent, wg *sync.WaitGroup, err error) {
@@ -504,59 +505,78 @@ func initFWConfig() {
 	fmt.Printf("Saved to %s\n", strconv.Quote(cfg))
 }
 
+const helpMessage = `fswatch usage:
+fswatch [OPTIONS]
+fswatch [Sub commands]
+
+OPTIONS:
+	-h, --help		show this help message
+	-v, --version	show version
+
+Examples:
+	fswatch ls -l  # show files when current directory file changes
+`
+
 func main() {
-	version := flag.Bool("version", false, "Show version")
-	configfile := flag.String("config", FWCONFIG_YAML, "Specify config file")
-	flag.Parse()
-
-	if *version {
-		fmt.Println(VERSION)
-		return
-	}
-
-	subCmd := flag.Arg(0)
-	var fwc FWConfig
-	var err error
-	if subCmd == "" {
-		fwc, err = readFWConfig(*configfile, FWCONFIG_JSON)
-		if err == nil {
-			subCmd = "start"
-		} else {
-			subCmd = "init"
+	args := os.Args[1:]
+	if len(args) == 1 {
+		switch args[0] {
+		case "-h", "--help":
+			fmt.Print(helpMessage)
+			fallthrough
+		case "-v", "--version":
+			fmt.Println(VERSION)
+			return
 		}
 	}
 
-	switch subCmd {
-	case "init":
-		initFWConfig()
-	case "start":
-		visits := make(map[string]bool)
-		fsw, err := fsnotify.NewWatcher()
+	fwc, err := readFWConfig(FWCONFIG_YAML, FWCONFIG_JSON)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if len(args) > 0 {
+		command, _ := shellquote.Quote(args)
+		fwc.Triggers = []TriggerEvent{{
+			Pattens: []string{"**/*.go", "**/*.c", "**/*.py"},
+			Environ: map[string]string{
+				"DEBUG": "1",
+			},
+			Shell:   false,
+			Command: command,
+		}}
+		fwc, err = fixFWConfig(fwc)
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		err = WatchPathAndChildren(fsw, fwc.WatchPaths, fwc.WatchDepth, visits)
-		if err != nil {
-			log.Println(err)
-		}
-
-		evtC, wg, err := drainEvent(fwc)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		sigOS := make(chan os.Signal, 1)
-		signal.Notify(sigOS, syscall.SIGINT)
-		signal.Notify(sigOS, syscall.SIGTERM)
-
-		go func() {
-			sig := <-sigOS
-			CPrintf(CPURPLE, "Catch signal %v!", sig)
-			close(evtC)
-		}()
-		go transformEvent(fsw, evtC)
-		wg.Wait()
-		CPrintf(CPURPLE, "Kill all running ... Done")
 	}
+
+	visits := make(map[string]bool)
+	fswatcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = WatchPathAndChildren(fswatcher, fwc.WatchPaths, fwc.WatchDepth, visits)
+	if err != nil {
+		log.Println(err)
+	}
+
+	evtC, wg, err := drainEvent(fwc)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	sigOS := make(chan os.Signal, 1)
+	signal.Notify(sigOS, syscall.SIGINT)
+	signal.Notify(sigOS, syscall.SIGTERM)
+
+	go func() {
+		sig := <-sigOS
+		CPrintf(CPURPLE, "Catch signal %v!", sig)
+		close(evtC)
+	}()
+	go transformEvent(fswatcher, evtC)
+	wg.Wait()
+	CPrintf(CPURPLE, "Kill all running ... Done")
 }
