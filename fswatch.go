@@ -457,7 +457,8 @@ func readFWConfig(paths ...string) (fwc FWConfig, err error) {
 	//fwc, err = fixFWConfig(fwc)
 	// data, _ = json.MarshalIndent(fwc, "", "    ")
 	// fmt.Println(string(data))
-	return fwc, errors.New("Config file not exists")
+	return fixFWConfig(fwc)
+	//return fwc, errors.New("Config file not exists")
 }
 
 func transformEvent(fsw *fsnotify.Watcher, evtC chan FSEvent) {
