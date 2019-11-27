@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -33,7 +34,7 @@ const (
 )
 
 var (
-	VERSION = "3.0"
+	VERSION = "3.1"
 )
 
 var signalMaps = map[string]os.Signal{
@@ -511,27 +512,42 @@ fswatch [OPTIONS]
 fswatch [Sub commands]
 
 OPTIONS:
-	-h, --help		show this help message
-	-v, --version	show version
+	-h, --help			show this help message
+	-v, --version	        show version
+	--config [filename]	specify config file [default: fsw.yml]
 
 Examples:
 	fswatch ls -l  # show files when current directory file changes
 `
 
+var (
+	version    bool   = false
+	configfile string = FWCONFIG_YAML
+)
+
 func main() {
-	args := os.Args[1:]
-	if len(args) == 1 {
-		switch args[0] {
-		case "-h", "--help":
-			fmt.Print(helpMessage)
-			fallthrough
-		case "-v", "--version":
-			fmt.Println(VERSION)
-			return
-		}
+	flag.BoolVar(&version, "version", false, "Show version")
+	flag.BoolVar(&version, "v", false, "Show version")
+	flag.StringVar(&configfile, "config", FWCONFIG_YAML, "Specify config file")
+	flag.Usage = func() {
+		fmt.Print(helpMessage)
+		return
 	}
 
-	fwc, err := readFWConfig(FWCONFIG_YAML, FWCONFIG_JSON)
+	var args []string
+	if len(os.Args) > 1 && strings.HasPrefix(os.Args[1], "-") {
+		flag.Parse()
+		args = flag.Args()
+	} else {
+		args = os.Args[1:]
+	}
+
+	if version {
+		fmt.Println(VERSION)
+		return
+	}
+
+	fwc, err := readFWConfig(configfile, FWCONFIG_JSON)
 	if err != nil {
 		log.Fatal(err)
 	}

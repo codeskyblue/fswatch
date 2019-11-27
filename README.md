@@ -43,6 +43,8 @@ fswatch >>> Kill all running ... Done
 ### Step 1
 Create a config file `.fsw.yml`
 
+> support specify config file through `fswatch --config myfsw.yml`
+
 config file example
 
 ```yaml
