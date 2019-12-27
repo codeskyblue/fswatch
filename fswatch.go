@@ -305,7 +305,7 @@ func genFWConfig() FWConfig {
 	return out
 }
 
-func UniqStrings(ss []string) []string {
+func uniqStrings(ss []string) []string {
 	out := make([]string, 0, len(ss))
 	m := make(map[string]bool, len(ss))
 	for _, key := range ss {
@@ -317,14 +317,14 @@ func UniqStrings(ss []string) []string {
 	return out
 }
 
-func IsDirectory(path string) bool {
+func isDirectory(path string) bool {
 	pinfo, err := os.Stat(path)
 	return err == nil && pinfo.IsDir()
 }
 
 var fileModifyTimeMap = make(map[string]time.Time)
 
-func IsChanged(path string) bool {
+func isChanged(path string) bool {
 	pinfo, err := os.Stat(path)
 	if err != nil {
 		return true
@@ -469,7 +469,7 @@ func transformEvent(fsw *fsnotify.Watcher, evtC chan FSEvent) {
 		}
 	}()
 	for evt := range fsw.Events {
-		if evt.Op == fsnotify.Create && IsDirectory(evt.Name) {
+		if evt.Op == fsnotify.Create && isDirectory(evt.Name) {
 			log.Info("Add watcher", evt.Name)
 			fsw.Add(evt.Name)
 			continue
@@ -480,7 +480,7 @@ func transformEvent(fsw *fsnotify.Watcher, evtC chan FSEvent) {
 			}
 			continue
 		}
-		if !IsChanged(evt.Name) {
+		if !isChanged(evt.Name) {
 			continue
 		}
 		//log.Printf("Changed: %s", evt.Name)
@@ -553,9 +553,21 @@ func main() {
 	}
 
 	if len(args) > 0 {
+		patterns := make([]string, 0, 5)
+		for _, argument := range args {
+			if _, err := os.Stat(argument); err == nil {
+				if fileExt := filepath.Ext(argument); fileExt != "" {
+					patterns = append(patterns, "**/*"+fileExt)
+				}
+			}
+		}
+		if len(patterns) == 0 {
+			patterns = append(patterns, "**/*.go", "**/*.c", "**/*.py")
+		}
+		log.Infof("Watche patterns: %v", patterns)
 		command, _ := shellquote.Quote(args)
 		fwc.Triggers = []TriggerEvent{{
-			Pattens: []string{"**/*.go", "**/*.c", "**/*.py"},
+			Pattens: patterns,
 			Environ: map[string]string{
 				"DEBUG": "1",
 			},
