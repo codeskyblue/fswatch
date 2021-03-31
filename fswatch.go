@@ -169,7 +169,7 @@ func (this *TriggerEvent) WatchEvent(evtC chan FSEvent, wg *sync.WaitGroup) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if !isMatch {
+		if !isMatch || strings.HasSuffix(evt.Name, "~") {
 			continue
 		}
 		if this.Stop(waitC) {
@@ -374,6 +374,7 @@ func WatchPathAndChildren(w *fsnotify.Watcher, config FWConfig, visits map[strin
 		if err != nil {
 			return err
 		}
+
 		if !isMatches && dir != "." {
 			return nil
 		}
