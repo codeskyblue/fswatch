@@ -1,5 +1,5 @@
 # fswatch
-[![Build Status](https://travis-ci.org/codeskyblue/fswatch.svg?branch=master)](https://travis-ci.org/codeskyblue/fswatch)
+
 [![Build status](https://ci.appveyor.com/api/projects/status/hble6an55u4a04e5/branch/master?svg=true)](https://ci.appveyor.com/project/codeskyblue/fswatch/branch/master)
 
 **fswatch** is a developer tool that triggers commands in response to filesystem changes.
@@ -7,7 +7,7 @@ Works well on Mac, Linux, and should also works on Windows(not well tested).
 
 ## Install
 ```
-go get -u -v github.com/codeskyblue/fswatch
+go install github.com/codeskyblue/fswatch@latest
 ```
 
 ## Simple way to use fswatch
