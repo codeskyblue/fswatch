@@ -58,7 +58,7 @@ triggers:
   shell: true
   cmd: go test -v
   delay: 100ms
-  stop_timeout:1s
+  stop_timeout: 1s
   signal: "KILL"
   kill_signal: "SIGTERM"
 watch_paths:
